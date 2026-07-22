@@ -1,0 +1,115 @@
+name: Build Test Upload
+
+on: [push, pull_request, workflow_dispatch]
+
+jobs:
+  macos:
+    runs-on: macos-latest
+
+    steps:
+      - name: Check out Git repository
+        uses: actions/checkout@v6
+
+      - name: Setup Python (for Mach-O)
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+
+      - name: Install Node.js and NPM
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: npm install
+        run: |
+          npm install
+
+      - name: npm test
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          npm run lint
+          npm exec tsc
+          npm run package
+          npm test
+
+      - name: upload
+        uses: actions/upload-artifact@v7
+        with:
+          name: macos
+          path: |
+            release/build/ReplayReporterForSlippi*.dmg
+  ubuntu:
+    runs-on: ubuntu-22.04
+
+    steps:
+      - name: Check out Git repository
+        uses: actions/checkout@v6
+
+      - name: Install Node.js and NPM
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install libudev
+        run: |
+          sudo apt update -y
+          sudo apt install -y libudev-dev
+
+      - name: npm install
+        run: |
+          npm install
+
+      - name: npm test
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          npm run lint
+          npm exec tsc
+          npm run package
+          npm test
+
+      - name: upload
+        uses: actions/upload-artifact@v7
+        with:
+          name: ubuntu
+          path: |
+            release/build/ReplayReporterForSlippi*.AppImage
+  windows:
+    runs-on: windows-latest
+
+    steps:
+      - name: Check out Git repository
+        uses: actions/checkout@v6
+
+      - name: Visual Studio build tools
+        run: |
+          choco install visualstudio2022-workload-vctools -y
+
+      - name: Install Node.js and NPM
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: npm install
+        run: |
+          npm install
+
+      - name: npm test
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          npm run lint
+          npm exec tsc
+          npm run package
+          npm test
+
+      - name: upload
+        uses: actions/upload-artifact@v7
+        with:
+          name: windows
+          path: |
+            release/build/ReplayReporterForSlippi*.exe
