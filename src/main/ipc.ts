@@ -1,7 +1,15 @@
 import { BrowserWindow, Cookie, ipcMain } from 'electron';
 import Store from 'electron-store';
-import { getTournament, getTournaments, getCurrentTournament } from './startgg';
+import {
+  getTournament,
+  getTournaments,
+  getCurrentTournament,
+  toggleParticipantPaid,
+  toggleParticipantAdded,
+  updateParticipantRegistration,
+} from './startgg';
 import { openStartggLoginWindow } from './loginwindow';
+import { Id } from '../common/types';
 
 export default function setupIPCs(mainWindow: BrowserWindow): void {
   const store = new Store<{
@@ -39,4 +47,40 @@ export default function setupIPCs(mainWindow: BrowserWindow): void {
   ipcMain.handle('getTournaments', async () => {
     return getTournaments(sggCookies);
   });
+
+  ipcMain.removeHandler('toggleParticipantPaid');
+  ipcMain.handle(
+    'toggleParticipantPaid',
+    async (event, attendee: Id, option: Id) => {
+      await toggleParticipantPaid(sggCookies, attendee, option);
+
+      mainWindow.webContents.send('tournament', {
+        startggTournament: getCurrentTournament(),
+      });
+
+      await updateParticipantRegistration(sggCookies, attendee, option);
+
+      mainWindow.webContents.send('tournament', {
+        startggTournament: getCurrentTournament(),
+      });
+    },
+  );
+
+  ipcMain.removeHandler('toggleParticipantAdded');
+  ipcMain.handle(
+    'toggleParticipantAdded',
+    async (event, attendee: Id, option: Id) => {
+      await toggleParticipantAdded(attendee, option);
+
+      mainWindow.webContents.send('tournament', {
+        startggTournament: getCurrentTournament(),
+      });
+
+      await updateParticipantRegistration(sggCookies, attendee, option);
+
+      mainWindow.webContents.send('tournament', {
+        startggTournament: getCurrentTournament(),
+      });
+    },
+  );
 }

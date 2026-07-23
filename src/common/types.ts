@@ -20,6 +20,7 @@ export type Tournament = {
   registrationOptions: RegistrationOption[];
   participantPaidStatuses: Record<Id, Record<number, boolean>>;
   participantRegisteredStatuses: Record<Id, Record<number, boolean>>;
+  updatingCheckboxes: string[];
 };
 
 export type AdminedTournament = {

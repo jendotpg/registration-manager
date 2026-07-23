@@ -24,47 +24,14 @@ const EVENT_COL_WIDTH = '126px';
 export default function StartggCheckinForm({
   gettingTournament,
   startggTournament,
-  updatingCheckboxes,
   setGettingTournament,
-  setUpdatingCheckboxes,
   close,
 }: {
   gettingTournament: boolean;
   startggTournament: Tournament;
-  updatingCheckboxes: string[];
   setGettingTournament: (val: boolean) => void;
-  setUpdatingCheckboxes: (val: string[]) => void;
   close: () => void;
 }) {
-  const handleParticipantPaidStatusToggle = (attendee: Id, option: any) => {
-    const currentRow =
-      startggTournament.participantPaidStatuses[attendee] || {};
-
-    return {
-      ...startggTournament.participantPaidStatuses,
-      [attendee]: {
-        ...currentRow,
-        [option]: !currentRow[option],
-      },
-    };
-  };
-
-  const handleParticipantRegisteredStatusToggle = (
-    attendee: Id,
-    option: any,
-  ) => {
-    const currentRow =
-      startggTournament.participantRegisteredStatuses[attendee] || {};
-
-    return {
-      ...startggTournament.participantRegisteredStatuses,
-      [attendee]: {
-        ...currentRow,
-        [option]: !currentRow[option],
-      },
-    };
-  };
-
   const tableMinWidth = `calc(${NAME_COL_WIDTH} + ${VENUE_COL_WIDTH} + ${
     startggTournament.registrationOptions.length
   } * ${EVENT_COL_WIDTH} + ${
@@ -94,7 +61,6 @@ export default function StartggCheckinForm({
           <IconButton
             onClick={() => {
               window.electron.getStartggTournament(startggTournament.slug);
-              setUpdatingCheckboxes([]);
             }}
           >
             <Refresh />
@@ -216,7 +182,7 @@ export default function StartggCheckinForm({
                               }
                             >
                               <Checkbox
-                                disabled={updatingCheckboxes.includes(
+                                disabled={startggTournament.updatingCheckboxes.includes(
                                   tournamentParticipant.id +
                                     ';' +
                                     registrationOption.id,
@@ -228,16 +194,9 @@ export default function StartggCheckinForm({
                                   ]?.[registrationOption.id]
                                 }
                                 onClick={() => {
-                                  handleParticipantPaidStatusToggle(
+                                  window.electron.toggleParticipantPaid(
                                     tournamentParticipant.id,
                                     registrationOption.id,
-                                  );
-                                  setUpdatingCheckboxes(
-                                    updatingCheckboxes.concat([
-                                      tournamentParticipant.id +
-                                        ';' +
-                                        registrationOption.id,
-                                    ]),
                                   );
                                 }}
                               />
@@ -263,7 +222,7 @@ export default function StartggCheckinForm({
                               }
                             >
                               <Checkbox
-                                disabled={updatingCheckboxes.includes(
+                                disabled={startggTournament.updatingCheckboxes.includes(
                                   tournamentParticipant.id +
                                     ';' +
                                     registrationOption.id,
@@ -276,16 +235,9 @@ export default function StartggCheckinForm({
                                   ]?.[registrationOption.id]
                                 }
                                 onClick={() => {
-                                  handleParticipantPaidStatusToggle(
+                                  window.electron.toggleParticipantPaid(
                                     tournamentParticipant.id,
                                     registrationOption.id,
-                                  );
-                                  setUpdatingCheckboxes(
-                                    updatingCheckboxes.concat([
-                                      tournamentParticipant.id +
-                                        ';' +
-                                        registrationOption.id,
-                                    ]),
                                   );
                                 }}
                               />
@@ -302,7 +254,7 @@ export default function StartggCheckinForm({
                               }
                             >
                               <Checkbox
-                                disabled={updatingCheckboxes.includes(
+                                disabled={startggTournament.updatingCheckboxes.includes(
                                   tournamentParticipant.id +
                                     ';' +
                                     registrationOption.id,
@@ -316,16 +268,9 @@ export default function StartggCheckinForm({
                                   ]?.[registrationOption.id]
                                 }
                                 onClick={() => {
-                                  handleParticipantRegisteredStatusToggle(
+                                  window.electron.toggleParticipantAdded(
                                     tournamentParticipant.id,
                                     registrationOption.id,
-                                  );
-                                  setUpdatingCheckboxes(
-                                    updatingCheckboxes.concat([
-                                      tournamentParticipant.id +
-                                        ';' +
-                                        registrationOption.id,
-                                    ]),
                                   );
                                 }}
                               />

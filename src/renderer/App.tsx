@@ -7,14 +7,17 @@ import StartggCheckinForm from './StartggCheckinForm';
 import { WindowEvent } from './setWindowEventListener';
 import ErrorDialog from './ErrorDialog';
 
-//TODO: mutate the goddamn values! this is read-only right now...
-//TODO: instead of no tournament selected, show settings!
+//TODO: grey out "paid" checkbox if user hasnt been added to event
+//TODO: grey out "added" checkbox if event has any sets reported
+//TODO: handle errors in `startgg.ts` gracefully - fetches will sometimes fail!
+// //debugging note: you can force this to fail by trying to remove a player who already has a set called
+//TODO: when no tournament selected, always show settings!
 //TODO: fix key uniqueness issue
 //TODO: add search bar
 //TODO: add copy feature
 //TODO: add filter feature for each checkbox
 //TODO: show scrollbars
-//TODO: get rid of the weird white box
+//TODO: get rid of the weird white box at the bottom of main
 
 function IndexPage() {
   const [errors, setErrors] = useState<string[]>([]);
@@ -37,6 +40,7 @@ function IndexPage() {
     participantPaidStatuses: {},
     participantRegisteredStatuses: {},
     participants: [],
+    updatingCheckboxes: [],
   });
 
   useEffect(() => {
@@ -51,6 +55,10 @@ function IndexPage() {
 
   useEffect(() => {
     window.electron.onTournament((e, { startggTournament: newTournament }) => {
+      console.log(
+        'new tournament, updating checkboxes are:',
+        newTournament.updatingCheckboxes,
+      );
       setStartggTournament(newTournament);
     });
   }, [startggTournament]);
@@ -73,16 +81,12 @@ function IndexPage() {
     }
   };
 
-  const [updatingCheckboxes, setUpdatingCheckboxes] = useState<string[]>([]);
-
   return (
     <>
       <StartggCheckinForm
         gettingTournament={gettingTournament}
         setGettingTournament={setGettingTournament}
         startggTournament={startggTournament}
-        updatingCheckboxes={updatingCheckboxes}
-        setUpdatingCheckboxes={setUpdatingCheckboxes}
         close={() => {}}
       />
 

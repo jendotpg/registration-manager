@@ -8,6 +8,7 @@ import {
 } from '../common/types';
 
 let currentTournament: Tournament | undefined;
+let venueFeeOption: Id | undefined;
 export function getCurrentTournament() {
   return currentTournament;
 }
@@ -78,6 +79,7 @@ export async function getTournament(sggCookies: Cookie[], slugOrShort: string) {
       registrationOptions: registration.registrationOptions,
       participantPaidStatuses: registration.participantPaidStatuses,
       participantRegisteredStatuses: registration.participantRegisteredStatuses,
+      updatingCheckboxes: [],
     };
 
     setCurrentTournament(tournament);
@@ -166,15 +168,20 @@ export function ingestRegistration(
   for (let rawRegistrationOption of queryResponse['tournamentRegistrationInfo'][
     'registrationOptions'
   ]) {
-    if (
-      rawRegistrationOption['optionType'] == 'tournament' ||
-      rawRegistrationOption['optionType'] == 'event'
-    ) {
+    if (rawRegistrationOption['optionType'] == 'tournament') {
+      venueFeeOption = rawRegistrationOption['values'][0]['id'];
+
       registrationOptions.push({
-        id:
-          rawRegistrationOption['optionType'] == 'tournament'
-            ? rawRegistrationOption['values'][0]['id'] // this is valid because tournament registrations have exactly one value...
-            : rawRegistrationOption['values'][0]['optionTypeId'],
+        id: rawRegistrationOption['values'][0]['id'],
+        name: rawRegistrationOption['name'],
+        type: rawRegistrationOption['optionType'],
+        options: rawRegistrationOption['values'].map(
+          (value: Record<string, string>) => value['name'],
+        ),
+      });
+    } else if (rawRegistrationOption['optionType'] == 'event') {
+      registrationOptions.push({
+        id: rawRegistrationOption['values'][0]['optionTypeId'],
         name: rawRegistrationOption['name'],
         type: rawRegistrationOption['optionType'],
         options: rawRegistrationOption['values'].map(
@@ -271,6 +278,149 @@ export async function getRegistration(cookies: Cookie[], slugOrShort: string) {
     participantPaidStatuses: participantPaidStatuses,
     participantRegisteredStatuses: participantRegisteredStatuses,
   };
+}
+
+const UPDATE_PARTICIPANT_REGISTRATION_QUERY = `
+mutation UpdateParticipantRegistration(
+  $participantId: ID!,
+  $regValueId: ID!,
+  $regValuePaid: Boolean,
+  $eventIds: [ID!],
+  $paidEventIds: [ID!]
+) {
+  updateParticipantRegistration(
+    participantId: $participantId
+    entrantData: {
+      eventIds: $eventIds,
+      paidEventIds: $paidEventIds
+    }
+    regData: [{
+      regValueId: $regValueId,
+      paid: $regValuePaid,
+      added: true
+    }]
+  ) {
+    id
+    registrationSelections{
+      regValue {
+        id
+        optionType
+        optionTypeId
+      }
+      balance
+    }
+  }
+}
+`;
+export async function updateParticipantRegistration(
+  cookies: Cookie[],
+  attendee: Id,
+  option: Id,
+) {
+  if (currentTournament == undefined) {
+    return;
+  }
+
+  const eventIds = Object.keys(
+    currentTournament.participantRegisteredStatuses[attendee],
+  ).filter(
+    (key: any) =>
+      currentTournament?.participantRegisteredStatuses[attendee][key],
+  );
+
+  const paidIds = Object.keys(
+    currentTournament.participantPaidStatuses[attendee],
+  )
+    .filter(
+      (key: any) => currentTournament?.participantPaidStatuses[attendee][key],
+    )
+    .filter((key: any) => key != venueFeeOption);
+
+  return fetchUnofficialGql(cookies, UPDATE_PARTICIPANT_REGISTRATION_QUERY, {
+    participantId: attendee,
+    regValueId: venueFeeOption,
+    regValuePaid:
+      currentTournament.participantPaidStatuses[attendee][venueFeeOption],
+    eventIds: eventIds,
+    paidEventIds: paidIds,
+  }).then((queryResponse) => {
+    if (currentTournament == undefined) {
+      return;
+    }
+
+    currentTournament.participantPaidStatuses[attendee] = {};
+    currentTournament.participantRegisteredStatuses[attendee] = {};
+    for (let registrationSelection of queryResponse[
+      'updateParticipantRegistration'
+    ]['registrationSelections']) {
+      const balance = registrationSelection['balance'];
+      if (registrationSelection['regValue']['optionType'] == 'event') {
+        const eventId = registrationSelection['regValue']['optionTypeId'];
+        currentTournament.participantRegisteredStatuses[attendee][eventId] =
+          true;
+        currentTournament.participantPaidStatuses[attendee][eventId] =
+          balance == 0;
+        currentTournament.updatingCheckboxes =
+          currentTournament.updatingCheckboxes.filter(
+            (key) => key != attendee + ';' + option,
+          );
+      } else if (
+        registrationSelection['regValue']['optionType'] == 'tournament'
+      ) {
+        const eventId = registrationSelection['regValue']['id'];
+
+        currentTournament.participantPaidStatuses[attendee][eventId] =
+          balance == 0;
+        currentTournament.updatingCheckboxes =
+          currentTournament.updatingCheckboxes.filter(
+            (key) => key != attendee + ';' + option,
+          );
+      }
+    }
+  });
+}
+
+export async function toggleParticipantPaid(
+  cookies: Cookie[],
+  attendee: Id,
+  option: any,
+) {
+  if (currentTournament == undefined || venueFeeOption == undefined) {
+    return;
+  }
+
+  const currentRow = currentTournament.participantPaidStatuses[attendee] || {};
+
+  const newParticipantPaidStatuses = {
+    ...currentTournament.participantPaidStatuses,
+    [attendee]: {
+      ...currentRow,
+      [option]: !currentRow[option],
+    },
+  };
+
+  currentTournament.updatingCheckboxes.push(attendee + ';' + option);
+  currentTournament.participantPaidStatuses = newParticipantPaidStatuses;
+}
+
+export async function toggleParticipantAdded(attendee: Id, option: any) {
+  if (currentTournament == undefined) {
+    return;
+  }
+
+  const currentRow =
+    currentTournament.participantRegisteredStatuses[attendee] || {};
+
+  const newParticipantAddedStatuses = {
+    ...currentTournament.participantRegisteredStatuses,
+    [attendee]: {
+      ...currentRow,
+      [option]: !currentRow[option],
+    },
+  };
+
+  currentTournament.updatingCheckboxes.push(attendee + ';' + option);
+  currentTournament.participantRegisteredStatuses = newParticipantAddedStatuses;
 }
 
 const GET_TOURNAMENTS_QUERY = `

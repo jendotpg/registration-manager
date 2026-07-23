@@ -11,10 +11,15 @@ const electronHandler = {
     ipcRenderer.invoke('openStartggLoginWindow'),
   getCurrentTournament: (): Promise<Tournament | undefined> =>
     ipcRenderer.invoke('getCurrentTournament'),
-  getStartggTournament: (slugOrShort: string): Promise<Tournament> =>
-    ipcRenderer.invoke('getStartggTournament', slugOrShort),
   getTournaments: (): Promise<AdminedTournament[]> =>
     ipcRenderer.invoke('getTournaments'),
+  getStartggTournament: (slugOrShort: string): Promise<Tournament> =>
+    ipcRenderer.invoke('getStartggTournament', slugOrShort),
+  toggleParticipantPaid: (attendee: Id, option: Id) =>
+    ipcRenderer.invoke('toggleParticipantPaid', attendee, option),
+  toggleParticipantAdded: (attendee: Id, option: Id) =>
+    ipcRenderer.invoke('toggleParticipantAdded', attendee, option),
+
   onTournament: (
     callback: (
       event: IpcRendererEvent,
