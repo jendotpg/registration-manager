@@ -90,18 +90,6 @@ export default function Settings({
           </Button>
         ) : (
           <DialogContent sx={{ pt: 0 }}>
-            <Stack>
-              <Button
-                endIcon={<Logout />}
-                onClick={async () => {
-                  await window.electron.logOut();
-                }}
-                variant="contained"
-              >
-                Log Out
-              </Button>
-            </Stack>
-
             <Stack direction="row">
               <InputBase
                 disabled
@@ -136,6 +124,18 @@ export default function Settings({
                   showErrorDialog={showErrorDialog}
                 />
               </Dialog>
+            </Stack>
+
+            <Stack>
+              <Button
+                endIcon={<Logout />}
+                onClick={async () => {
+                  await window.electron.logOut();
+                }}
+                variant="contained"
+              >
+                Log Out
+              </Button>
             </Stack>
           </DialogContent>
         )}{' '}

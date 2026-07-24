@@ -1,4 +1,4 @@
-import { BrowserWindow, Cookie, ipcMain } from 'electron';
+import { BrowserWindow, Cookie, ipcMain, session } from 'electron';
 import Store from 'electron-store';
 import {
   getTournament,
@@ -11,6 +11,7 @@ import {
 } from './startgg';
 import { openStartggLoginWindow } from './loginwindow';
 import { Id } from '../common/types';
+import { electron } from 'process';
 
 export default function setupIPCs(mainWindow: BrowserWindow): void {
   const store = new Store<{
@@ -23,6 +24,10 @@ export default function setupIPCs(mainWindow: BrowserWindow): void {
 
   ipcMain.removeHandler('logOut');
   ipcMain.handle('logOut', (event) => {
+    session.defaultSession.clearStorageData({
+      storages: ['cookies'],
+    });
+
     startggCookies = [];
     store.set('startggCookies', []);
 
