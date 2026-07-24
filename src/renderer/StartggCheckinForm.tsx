@@ -7,9 +7,6 @@ import {
 import {
   CircularProgress,
   Checkbox,
-  DialogContent,
-  DialogContentText,
-  DialogTitle,
   IconButton,
   Stack,
   Tooltip,
@@ -17,20 +14,20 @@ import {
 } from '@mui/material';
 import { Refresh } from '@mui/icons-material';
 
-const NAME_COL_WIDTH = '256px';
-const VENUE_COL_WIDTH = '96px';
-const EVENT_COL_WIDTH = '126px';
+const NAME_COL_WIDTH = '15%';
+const VENUE_COL_WIDTH = '10%';
+const EVENT_COL_WIDTH = '13%';
 
 export default function StartggCheckinForm({
   gettingTournament,
   startggTournament,
   setGettingTournament,
-  close,
+  showErrorDialog,
 }: {
   gettingTournament: boolean;
   startggTournament: Tournament;
   setGettingTournament: (val: boolean) => void;
-  close: () => void;
+  showErrorDialog: (errors: string[]) => void;
 }) {
   const tableMinWidth = `calc(${NAME_COL_WIDTH} + ${VENUE_COL_WIDTH} + ${
     startggTournament.registrationOptions.length
@@ -45,7 +42,7 @@ export default function StartggCheckinForm({
       margin="16px"
       padding="8px"
     >
-      <DialogTitle sx={{ padding: 0 }}>No tournament selected!</DialogTitle>
+      <Typography sx={{ padding: 0 }}>No tournament selected!</Typography>
     </Stack>
   ) : (
     <>
@@ -56,11 +53,18 @@ export default function StartggCheckinForm({
         margin="16px"
         padding="8px"
       >
-        <DialogTitle sx={{ padding: 0 }}>{startggTournament.name}</DialogTitle>
+        <Typography sx={{ padding: 0 }}>{startggTournament.name}</Typography>
         <Tooltip arrow title="Refresh">
           <IconButton
-            onClick={() => {
-              window.electron.getStartggTournament(startggTournament.slug);
+            onClick={async () => {
+              try {
+                await window.electron.getStartggTournament(
+                  startggTournament.slug,
+                );
+                setGettingTournament(false);
+              } catch (e: any) {
+                showErrorDialog([e instanceof Error ? e.message : e]);
+              }
             }}
           >
             <Refresh />
@@ -107,23 +111,25 @@ export default function StartggCheckinForm({
             </Typography>
 
             {startggTournament.registrationOptions.map((registrationOption) => (
-              <Typography
-                key={`${registrationOption.id}-name`}
-                noWrap
-                align="center"
-                sx={{
-                  width:
-                    registrationOption.type == 'tournament'
-                      ? VENUE_COL_WIDTH
-                      : EVENT_COL_WIDTH,
-                  flexShrink: 0,
-                  fontWeight: 'bold',
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                }}
-              >
-                {registrationOption.name}
-              </Typography>
+              <Tooltip title={registrationOption.name}>
+                <Typography
+                  key={`${registrationOption.id}-name`}
+                  noWrap
+                  align="center"
+                  sx={{
+                    width:
+                      registrationOption.type == 'tournament'
+                        ? VENUE_COL_WIDTH
+                        : EVENT_COL_WIDTH,
+                    flexShrink: 0,
+                    fontWeight: 'bold',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                  }}
+                >
+                  {registrationOption.name}
+                </Typography>
+              </Tooltip>
             ))}
           </Stack>
 
@@ -131,9 +137,7 @@ export default function StartggCheckinForm({
             {gettingTournament ? (
               <Stack direction="row" margin="8px 24px" spacing="8px">
                 <CircularProgress size="24px" />
-                <DialogContentText>
-                  Getting tournament attendees ...
-                </DialogContentText>
+                <Typography>Getting tournament attendees ...</Typography>
               </Stack>
             ) : (
               startggTournament.participants.map(
@@ -145,24 +149,35 @@ export default function StartggCheckinForm({
                     spacing="32px"
                     padding="4px 24px"
                   >
-                    <Typography
-                      noWrap
-                      sx={{
-                        width: NAME_COL_WIDTH,
-                        flexShrink: 0,
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        position: 'sticky',
-                        left: 0,
-                        zIndex: 1,
-                        backgroundColor: 'background.paper',
-                      }}
+                    <Tooltip
+                      title={
+                        (tournamentParticipant.prefix
+                          ? tournamentParticipant.prefix + '|'
+                          : '') +
+                        tournamentParticipant.displayName +
+                        ' (' +
+                        tournamentParticipant.id +
+                        ')'
+                      }
                     >
-                      {(tournamentParticipant.prefix
-                        ? tournamentParticipant.prefix + '|'
-                        : '') + tournamentParticipant.displayName}
-                    </Typography>
-
+                      <Typography
+                        noWrap
+                        sx={{
+                          width: NAME_COL_WIDTH,
+                          flexShrink: 0,
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          position: 'sticky',
+                          left: 0,
+                          zIndex: 1,
+                          backgroundColor: 'background.paper',
+                        }}
+                      >
+                        {(tournamentParticipant.prefix
+                          ? tournamentParticipant.prefix + '|'
+                          : '') + tournamentParticipant.displayName}
+                      </Typography>
+                    </Tooltip>
                     {startggTournament.registrationOptions.map(
                       (registrationOption) =>
                         registrationOption.type == 'tournament' ? (
@@ -193,11 +208,17 @@ export default function StartggCheckinForm({
                                     tournamentParticipant.id
                                   ]?.[registrationOption.id]
                                 }
-                                onClick={() => {
-                                  window.electron.toggleParticipantPaid(
-                                    tournamentParticipant.id,
-                                    registrationOption.id,
-                                  );
+                                onClick={async () => {
+                                  try {
+                                    await window.electron.toggleParticipantPaid(
+                                      tournamentParticipant.id,
+                                      registrationOption.id,
+                                    );
+                                  } catch (e: any) {
+                                    showErrorDialog([
+                                      e instanceof Error ? e.message : e,
+                                    ]);
+                                  }
                                 }}
                               />
                             </Tooltip>
@@ -234,11 +255,17 @@ export default function StartggCheckinForm({
                                     tournamentParticipant.id
                                   ]?.[registrationOption.id]
                                 }
-                                onClick={() => {
-                                  window.electron.toggleParticipantPaid(
-                                    tournamentParticipant.id,
-                                    registrationOption.id,
-                                  );
+                                onClick={async () => {
+                                  try {
+                                    await window.electron.toggleParticipantPaid(
+                                      tournamentParticipant.id,
+                                      registrationOption.id,
+                                    );
+                                  } catch (e: any) {
+                                    showErrorDialog([
+                                      e instanceof Error ? e.message : e,
+                                    ]);
+                                  }
                                 }}
                               />
                             </Tooltip>
@@ -267,11 +294,17 @@ export default function StartggCheckinForm({
                                     tournamentParticipant.id
                                   ]?.[registrationOption.id]
                                 }
-                                onClick={() => {
-                                  window.electron.toggleParticipantAdded(
-                                    tournamentParticipant.id,
-                                    registrationOption.id,
-                                  );
+                                onClick={async () => {
+                                  try {
+                                    await window.electron.toggleParticipantAdded(
+                                      tournamentParticipant.id,
+                                      registrationOption.id,
+                                    );
+                                  } catch (e: any) {
+                                    showErrorDialog([
+                                      e instanceof Error ? e.message : e,
+                                    ]);
+                                  }
                                 }}
                               />
                             </Tooltip>

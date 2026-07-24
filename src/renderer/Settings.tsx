@@ -3,6 +3,7 @@ import {
   Login as LoginIcon,
   Refresh,
   Edit,
+  Logout,
 } from '@mui/icons-material';
 import {
   Button,
@@ -19,26 +20,21 @@ import {
 } from '@mui/material';
 import { useEffect, useState } from 'react';
 import { AdminedTournament, Tournament } from '../common/types';
-import StartggTournamentForm from './StartggTournamentForm';
-
-//TODO: show logged in status (and whether cookies are up to date!)
-//TODO: allow log out
-//TODO: when this opens, get admin list
-//TODO: after selecting a tournament, close startgg form too
-//TODO: make the tournament selector a bit prettier (bounding box?)
+import StartggTournamentSelectorForm from './StartggTournamentSelectorForm';
 
 export default function Settings({
+  loggedInStatus,
   slugDialogOpen,
   gettingTournament,
   startggTournament,
   adminedTournaments,
   gettingAdminedTournaments,
   setSlugDialogOpen,
-  setAdminedTournaments,
   setGettingAdminedTournaments,
   showErrorDialog,
   getStartggTournament,
 }: {
+  loggedInStatus: boolean;
   slugDialogOpen: boolean;
   gettingTournament: boolean;
   startggTournament: Tournament;
@@ -46,12 +42,11 @@ export default function Settings({
   gettingAdminedTournaments: boolean;
   setSlugDialogOpen: (val: boolean) => void;
   setGettingTournament: (val: boolean) => void;
-  setAdminedTournaments: (tournaments: AdminedTournament[]) => void;
   setGettingAdminedTournaments: (gettingAdminedTournaments: boolean) => void;
   showErrorDialog: (errors: string[]) => void;
   getStartggTournament: (maybeSlug: string) => Promise<Tournament | undefined>;
 }) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(true);
 
   return (
     <>
@@ -70,16 +65,6 @@ export default function Settings({
       <Dialog
         fullWidth
         open={open}
-        onLoad={async () => {
-          try {
-            setGettingAdminedTournaments(true);
-            setAdminedTournaments(await window.electron.getTournaments());
-          } catch (e: any) {
-            showErrorDialog([e instanceof Error ? e.message : e]);
-          } finally {
-            setGettingAdminedTournaments(false);
-          }
-        }}
         onClose={async () => {
           setOpen(false);
         }}
@@ -93,91 +78,67 @@ export default function Settings({
           <DialogTitle>Settings</DialogTitle>
           <Typography variant="caption">Registration Manager</Typography>
         </Stack>
-        <DialogContent sx={{ pt: 0 }}>
-          <Stack>
-            <Button
-              endIcon={<LoginIcon />}
-              onClick={async () => {
-                await window.electron.openStartggLoginWindow();
-              }}
-              variant="contained"
-            >
-              Login to Startgg!
-            </Button>
-          </Stack>
-
-          <Stack direction="row">
-            <InputBase
-              disabled
-              size="small"
-              value={startggTournament.slug || 'Set start.gg tournament...'}
-              style={{ flexGrow: 1 }}
-            />
-            <Tooltip arrow title="Refresh tournament and all descendants">
-              <div>
-                <IconButton
-                  disabled={gettingTournament}
-                  onClick={() => getStartggTournament(startggTournament.slug)}
-                >
-                  {gettingTournament ? (
-                    <CircularProgress size="24px" />
-                  ) : (
-                    <Refresh />
-                  )}
-                </IconButton>
-              </div>
-            </Tooltip>
-            <Tooltip arrow title="Set start.gg tournament">
-              <IconButton
-                aria-label="Set start.gg tournament"
-                onClick={() => setSlugDialogOpen(true)}
-              >
-                <Edit />
-              </IconButton>
-            </Tooltip>
-            <Dialog
-              open={slugDialogOpen}
-              onClose={() => {
-                setSlugDialogOpen(false);
-              }}
-              onLoad={async () => {
-                try {
-                  setGettingAdminedTournaments(true);
-                  setAdminedTournaments(await window.electron.getTournaments());
-                } catch (e: any) {
-                  showErrorDialog([e instanceof Error ? e.message : e]);
-                } finally {
-                  setGettingAdminedTournaments(false);
-                }
-              }}
-            >
-              <StartggTournamentForm
-                gettingAdminedTournaments={gettingAdminedTournaments}
-                adminedTournaments={adminedTournaments}
-                gettingTournament={gettingTournament}
-                getAdminedTournaments={async () => {
-                  setGettingAdminedTournaments(true);
-                  try {
-                    setAdminedTournaments(
-                      await window.electron.getTournaments(),
-                    );
-                  } catch (e: unknown) {
-                    showErrorDialog([
-                      `Unable to fetch admined tournaments: ${
-                        e instanceof Error ? e.message : e
-                      }`,
-                    ]);
-                  }
-                  setGettingAdminedTournaments(false);
+        {!loggedInStatus ? (
+          <Button
+            endIcon={<LoginIcon />}
+            onClick={async () => {
+              await window.electron.openStartggLoginWindow();
+            }}
+            variant="contained"
+          >
+            Login to Startgg!
+          </Button>
+        ) : (
+          <DialogContent sx={{ pt: 0 }}>
+            <Stack>
+              <Button
+                endIcon={<Logout />}
+                onClick={async () => {
+                  await window.electron.logOut();
                 }}
-                getTournament={getStartggTournament}
-                close={() => {
+                variant="contained"
+              >
+                Log Out
+              </Button>
+            </Stack>
+
+            <Stack direction="row">
+              <InputBase
+                disabled
+                size="small"
+                value={startggTournament.slug || 'Set start.gg tournament...'}
+                style={{ flexGrow: 1 }}
+              />
+              <Tooltip arrow title="Set start.gg tournament">
+                <IconButton
+                  aria-label="Set start.gg tournament"
+                  onClick={() => setSlugDialogOpen(true)}
+                >
+                  <Edit />
+                </IconButton>
+              </Tooltip>
+              <Dialog
+                open={slugDialogOpen}
+                onClose={() => {
                   setSlugDialogOpen(false);
                 }}
-              />
-            </Dialog>
-          </Stack>
-        </DialogContent>
+              >
+                <StartggTournamentSelectorForm
+                  gettingAdminedTournaments={gettingAdminedTournaments}
+                  adminedTournaments={adminedTournaments}
+                  gettingTournament={gettingTournament}
+                  getTournament={getStartggTournament}
+                  close={() => {
+                    setSlugDialogOpen(false);
+                    setOpen(false);
+                  }}
+                  setGettingAdminedTournaments={setGettingAdminedTournaments}
+                  showErrorDialog={showErrorDialog}
+                />
+              </Dialog>
+            </Stack>
+          </DialogContent>
+        )}{' '}
       </Dialog>
     </>
   );

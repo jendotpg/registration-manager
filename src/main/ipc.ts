@@ -2,27 +2,53 @@ import { BrowserWindow, Cookie, ipcMain } from 'electron';
 import Store from 'electron-store';
 import {
   getTournament,
-  getTournaments,
+  getAdminedTournaments,
   getCurrentTournament,
   toggleParticipantPaid,
   toggleParticipantAdded,
   updateParticipantRegistration,
+  getLastAuthenticatedRequestSucceeded,
 } from './startgg';
 import { openStartggLoginWindow } from './loginwindow';
 import { Id } from '../common/types';
 
 export default function setupIPCs(mainWindow: BrowserWindow): void {
   const store = new Store<{
-    sggCookies: Cookie[];
+    startggCookies: Cookie[];
   }>();
 
-  let sggCookies = store.has('sggCookies') ? store.get('sggCookies') : [];
+  let startggCookies = store.has('startggCookies')
+    ? store.get('startggCookies')
+    : [];
+
+  ipcMain.removeHandler('logOut');
+  ipcMain.handle('logOut', (event) => {
+    startggCookies = [];
+    store.set('startggCookies', []);
+
+    mainWindow.webContents.send('loggedInStatus', {
+      loggedInStatus: false,
+    });
+
+    mainWindow.webContents.send('tournament', {
+      startggTournament: {
+        slug: '',
+        name: '',
+        registrationOptions: [],
+        participantPaidStatuses: {},
+        participantRegisteredStatuses: {},
+        participants: [],
+        updatingCheckboxes: [],
+      },
+    });
+  });
 
   ipcMain.removeHandler('openStartggLoginWindow');
-  ipcMain.handle('openStartggLoginWindow', () => {
+  ipcMain.handle('openStartggLoginWindow', (event) => {
     openStartggLoginWindow((cookies) => {
-      store.set('sggCookies', cookies);
-    });
+      store.set('startggCookies', cookies);
+      startggCookies = cookies;
+    }, mainWindow);
   });
 
   ipcMain.removeHandler('getCurrentTournament');
@@ -30,11 +56,11 @@ export default function setupIPCs(mainWindow: BrowserWindow): void {
 
   ipcMain.removeHandler('getStartggTournament');
   ipcMain.handle('getStartggTournament', async (event, slugOrShort: string) => {
-    if (!sggCookies) {
+    if (!startggCookies) {
       throw new Error('Please log into start.gg');
     }
 
-    const tournament = await getTournament(sggCookies, slugOrShort);
+    const tournament = await getTournament(startggCookies, slugOrShort);
 
     mainWindow.webContents.send('tournament', {
       startggTournament: getCurrentTournament(),
@@ -43,25 +69,41 @@ export default function setupIPCs(mainWindow: BrowserWindow): void {
     return tournament;
   });
 
-  ipcMain.removeHandler('getTournaments');
-  ipcMain.handle('getTournaments', async () => {
-    return getTournaments(sggCookies);
+  ipcMain.removeHandler('getAdminedTournaments');
+  ipcMain.handle('getAdminedTournaments', async () => {
+    return getAdminedTournaments(startggCookies).then(
+      async (adminedTournaments) => {
+        mainWindow.webContents.send('loggedInStatus', {
+          loggedInStatus: getLastAuthenticatedRequestSucceeded(),
+        });
+
+        mainWindow.webContents.send('adminedTournaments', {
+          adminedTournaments: adminedTournaments,
+        });
+      },
+    );
   });
 
   ipcMain.removeHandler('toggleParticipantPaid');
   ipcMain.handle(
     'toggleParticipantPaid',
     async (event, attendee: Id, option: Id) => {
-      await toggleParticipantPaid(sggCookies, attendee, option);
+      await toggleParticipantPaid(startggCookies, attendee, option);
 
       mainWindow.webContents.send('tournament', {
         startggTournament: getCurrentTournament(),
       });
+      mainWindow.webContents.send('loggedInStatus', {
+        loggedInStatus: getLastAuthenticatedRequestSucceeded(),
+      });
 
-      await updateParticipantRegistration(sggCookies, attendee, option);
+      await updateParticipantRegistration(startggCookies, attendee, option);
 
       mainWindow.webContents.send('tournament', {
         startggTournament: getCurrentTournament(),
+      });
+      mainWindow.webContents.send('loggedInStatus', {
+        loggedInStatus: getLastAuthenticatedRequestSucceeded(),
       });
     },
   );
@@ -75,11 +117,17 @@ export default function setupIPCs(mainWindow: BrowserWindow): void {
       mainWindow.webContents.send('tournament', {
         startggTournament: getCurrentTournament(),
       });
+      mainWindow.webContents.send('loggedInStatus', {
+        loggedInStatus: getLastAuthenticatedRequestSucceeded(),
+      });
 
-      await updateParticipantRegistration(sggCookies, attendee, option);
+      await updateParticipantRegistration(startggCookies, attendee, option);
 
       mainWindow.webContents.send('tournament', {
         startggTournament: getCurrentTournament(),
+      });
+      mainWindow.webContents.send('loggedInStatus', {
+        loggedInStatus: getLastAuthenticatedRequestSucceeded(),
       });
     },
   );

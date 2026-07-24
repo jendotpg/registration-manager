@@ -4,7 +4,8 @@ import { getAssetPath } from './util';
 let loginWindow: BrowserWindow | null = null;
 
 export function openStartggLoginWindow(
-  setSggCookies: (cookies: Electron.Cookie[]) => void,
+  setStartggCookies: (cookies: Electron.Cookie[]) => void,
+  mainWindow: BrowserWindow,
 ) {
   loginWindow = new BrowserWindow({
     minWidth: 400,
@@ -19,20 +20,26 @@ export function openStartggLoginWindow(
   loginWindow.loadURL('https://start.gg/login');
 
   loginWindow.webContents.on('did-navigate-in-page', async (event, url) => {
-    console.log('navigated in page:', url);
-
     if (url === 'https://www.start.gg/') {
-      const sggCookies = await loginWindow?.webContents.session.cookies.get({
-        url: 'https://www.start.gg/',
-      });
-      setSggCookies(sggCookies ? sggCookies : []);
-      loginWindow?.close();
-
-      console.log(
-        sggCookies
-          ?.map((cookie) => `${cookie.name}=${cookie.value}`)
-          .join('; '),
+      const startggCookies = await loginWindow?.webContents.session.cookies.get(
+        {
+          url: 'https://www.start.gg/',
+        },
       );
+      if (startggCookies != undefined) {
+        setStartggCookies(startggCookies);
+
+        mainWindow.webContents.send('loggedInStatus', {
+          loggedInStatus: true,
+        });
+
+        console.log(
+          startggCookies
+            ?.map((cookie) => `${cookie.name}=${cookie.value}`)
+            .join('; '),
+        );
+      }
+      loginWindow?.close();
     }
   });
 

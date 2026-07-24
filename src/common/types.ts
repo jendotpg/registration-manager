@@ -1,4 +1,4 @@
-export type Id = string | number;
+export type Id = number;
 
 export type Participant = {
   id: Id;
@@ -18,7 +18,7 @@ export type Tournament = {
   name: string;
   participants: Participant[];
   registrationOptions: RegistrationOption[];
-  participantPaidStatuses: Record<Id, Record<number, boolean>>;
+  participantPaidStatuses: Record<number, Record<number, boolean>>;
   participantRegisteredStatuses: Record<Id, Record<number, boolean>>;
   updatingCheckboxes: string[];
 };

@@ -16,22 +16,26 @@ import { FormEvent } from 'react';
 import { Refresh } from '@mui/icons-material';
 import { AdminedTournament, Tournament } from '../common/types';
 
-export default function StartggTournamentForm({
+export default function StartggTournamentSelectorForm({
   gettingAdminedTournaments,
   adminedTournaments,
   gettingTournament,
-  getAdminedTournaments,
+  setGettingAdminedTournaments,
   getTournament,
+  showErrorDialog,
   close,
 }: {
   gettingAdminedTournaments: boolean;
   adminedTournaments: AdminedTournament[];
   gettingTournament: boolean;
-  getAdminedTournaments: () => Promise<void>;
+  setGettingAdminedTournaments: (gettingAdminedTournaments: boolean) => void;
+
   getTournament: (
     maybeSlug: string,
     initial?: boolean,
   ) => Promise<Tournament | undefined>;
+  showErrorDialog: (errors: string[]) => void;
+
   close: () => void;
 }) {
   const getTournamentOnSubmit = async (event: FormEvent<HTMLFormElement>) => {
@@ -42,7 +46,7 @@ export default function StartggTournamentForm({
     event.preventDefault();
     event.stopPropagation();
     if (slugOrShort) {
-      const tournament = await getTournament(slugOrShort);
+      await getTournament(slugOrShort);
       close();
     }
   };
@@ -60,7 +64,11 @@ export default function StartggTournamentForm({
           <CircularProgress size="24px" style={{ padding: '8px' }} />
         ) : (
           <Tooltip arrow title="Refresh">
-            <IconButton onClick={getAdminedTournaments}>
+            <IconButton
+              onClick={() => {
+                window.electron.getAdminedTournaments();
+              }}
+            >
               <Refresh />
             </IconButton>
           </Tooltip>
@@ -74,7 +82,16 @@ export default function StartggTournamentForm({
             margin: '8px 24px',
             gap: '8px',
           }}
-          onSubmit={getTournamentOnSubmit}
+          onSubmit={async () => {
+            try {
+              setGettingAdminedTournaments(true);
+              await window.electron.getAdminedTournaments();
+            } catch (e: any) {
+              showErrorDialog([e instanceof Error ? e.message : e]);
+            } finally {
+              setGettingAdminedTournaments(false);
+            }
+          }}
         >
           <TextField
             label="Tournament Slug"

@@ -11,8 +11,11 @@ const electronHandler = {
     ipcRenderer.invoke('openStartggLoginWindow'),
   getCurrentTournament: (): Promise<Tournament | undefined> =>
     ipcRenderer.invoke('getCurrentTournament'),
-  getTournaments: (): Promise<AdminedTournament[]> =>
-    ipcRenderer.invoke('getTournaments'),
+  logOut: (): Promise<void> => ipcRenderer.invoke('logOut'),
+  getLoggedInStatus: (): Promise<boolean> =>
+    ipcRenderer.invoke('getLoggedInStatus'),
+  getAdminedTournaments: (): Promise<void> =>
+    ipcRenderer.invoke('getAdminedTournaments'),
   getStartggTournament: (slugOrShort: string): Promise<Tournament> =>
     ipcRenderer.invoke('getStartggTournament', slugOrShort),
   toggleParticipantPaid: (attendee: Id, option: Id) =>
@@ -20,6 +23,28 @@ const electronHandler = {
   toggleParticipantAdded: (attendee: Id, option: Id) =>
     ipcRenderer.invoke('toggleParticipantAdded', attendee, option),
 
+  onLoggedInStatus: (
+    callback: (
+      event: IpcRendererEvent,
+      data: {
+        loggedInStatus: boolean;
+      },
+    ) => void,
+  ) => {
+    ipcRenderer.removeAllListeners('loggedInStatus');
+    ipcRenderer.on('loggedInStatus', callback);
+  },
+  onAdminedTournaments: (
+    callback: (
+      event: IpcRendererEvent,
+      data: {
+        adminedTournaments: AdminedTournament[];
+      },
+    ) => void,
+  ) => {
+    ipcRenderer.removeAllListeners('adminedTournaments');
+    ipcRenderer.on('adminedTournaments', callback);
+  },
   onTournament: (
     callback: (
       event: IpcRendererEvent,

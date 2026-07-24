@@ -7,8 +7,13 @@ import {
   RegistrationOption,
 } from '../common/types';
 
+let lastAuthenticatedRequestSucceeded: boolean = false;
 let currentTournament: Tournament | undefined;
 let venueFeeOption: Id | undefined;
+export function getLastAuthenticatedRequestSucceeded() {
+  return lastAuthenticatedRequestSucceeded;
+}
+
 export function getCurrentTournament() {
   return currentTournament;
 }
@@ -62,16 +67,15 @@ async function wrappedFetch(
   return response;
 }
 
-export async function getTournament(sggCookies: Cookie[], slugOrShort: string) {
+export async function getTournament(cookies: Cookie[], slugOrShort: string) {
   const response = await wrappedFetch(
-    //TODO: MAKE THIS USE THE RIGHT API - ideally it works on private events too :)
     `https://api.start.gg/tournament/${slugOrShort}?expand[]=event`,
   );
   const json = await response.json();
   const { name, locationDisplayName: location } = json.entities.tournament;
   const slug = json.entities.tournament.slug.slice(11);
 
-  return getRegistration(sggCookies, slugOrShort).then((registration) => {
+  return getRegistration(cookies, slugOrShort).then((registration) => {
     const tournament = {
       name,
       slug,
@@ -107,7 +111,7 @@ async function fetchUnofficialGql(
   const json = await response.json();
   if (Array.isArray(json.errors) && json.errors.length > 0) {
     const message = json.errors[0].message as string;
-    const retryMsg = '. Try again.';
+    const retryMsg = '';
     throw new Error(`${message}${retryMsg}`);
   }
 
@@ -317,7 +321,7 @@ export async function updateParticipantRegistration(
   attendee: Id,
   option: Id,
 ) {
-  if (currentTournament == undefined) {
+  if (currentTournament == undefined || venueFeeOption == undefined) {
     return;
   }
 
@@ -347,6 +351,8 @@ export async function updateParticipantRegistration(
     if (currentTournament == undefined) {
       return;
     }
+
+    lastAuthenticatedRequestSucceeded = true;
 
     currentTournament.participantPaidStatuses[attendee] = {};
     currentTournament.participantRegisteredStatuses[attendee] = {};
@@ -436,14 +442,21 @@ const GET_TOURNAMENTS_QUERY = `
     }
   }
 `;
-export async function getTournaments(
+export async function getAdminedTournaments(
   cookies: Cookie[],
 ): Promise<AdminedTournament[]> {
-  const data = await fetchUnofficialGql(cookies, GET_TOURNAMENTS_QUERY, {});
-  return data.currentUser.tournaments.nodes
-    .filter((tournament: any) => tournament.hasOfflineEvents)
-    .map((tournament: any) => ({
-      slug: tournament.slug.slice(11),
-      name: tournament.name,
-    }));
+  return fetchUnofficialGql(cookies, GET_TOURNAMENTS_QUERY, {})
+    .then(async (data) => {
+      lastAuthenticatedRequestSucceeded = true;
+      return data.currentUser.tournaments.nodes
+        .filter((tournament: any) => tournament.hasOfflineEvents)
+        .map((tournament: any) => ({
+          slug: tournament.slug.slice(11),
+          name: tournament.name,
+        }));
+    })
+    .catch(async (e) => {
+      lastAuthenticatedRequestSucceeded = true;
+      throw e;
+    });
 }

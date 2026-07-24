@@ -7,19 +7,20 @@ import StartggCheckinForm from './StartggCheckinForm';
 import { WindowEvent } from './setWindowEventListener';
 import ErrorDialog from './ErrorDialog';
 
-//TODO: grey out "paid" checkbox if user hasnt been added to event
 //TODO: grey out "added" checkbox if event has any sets reported
-//TODO: handle errors in `startgg.ts` gracefully - fetches will sometimes fail!
-// //debugging note: you can force this to fail by trying to remove a player who already has a set called
-//TODO: when no tournament selected, always show settings!
-//TODO: fix key uniqueness issue
-//TODO: add search bar
+//TODO: grey out "paid" checkbox on free events
+//TODO: when selecting "paid" checkbox if user hasnt been added to event, also add them!
 //TODO: add copy feature
 //TODO: add filter feature for each checkbox
-//TODO: show scrollbars
+//TODO: add search bar
 //TODO: get rid of the weird white box at the bottom of main
+//TODO: make main/startgg.ts:getTournament() use the unofficial api - so that it works on private events too :)
+//TODO: show scrollbars
+//TODO: fix key uniqueness issue
+//TODO: make the tournament selector a bit prettier (bounding box?)
 
 function IndexPage() {
+  const [loggedInStatus, setLoggedInStatus] = useState<boolean>(false);
   const [errors, setErrors] = useState<string[]>([]);
   const [errorDialogOpen, setErrorDialogOpen] = useState(false);
   const showErrorDialog = (messages: string[]) => {
@@ -54,14 +55,36 @@ function IndexPage() {
   }, []);
 
   useEffect(() => {
+    window.electron.onLoggedInStatus((e, { loggedInStatus }) => {
+      setLoggedInStatus(loggedInStatus);
+    });
+  }, [loggedInStatus]);
+
+  useEffect(() => {
+    window.electron.onAdminedTournaments((e, { adminedTournaments }) => {
+      setAdminedTournaments(adminedTournaments);
+      setGettingAdminedTournaments(false);
+    });
+  }, [adminedTournaments, gettingAdminedTournaments]);
+
+  useEffect(() => {
     window.electron.onTournament((e, { startggTournament: newTournament }) => {
-      console.log(
-        'new tournament, updating checkboxes are:',
-        newTournament.updatingCheckboxes,
-      );
       setStartggTournament(newTournament);
     });
   }, [startggTournament]);
+
+  useEffect(() => {
+    setGettingAdminedTournaments(true);
+    window.electron
+      .getAdminedTournaments()
+      .then(() => {
+        setGettingAdminedTournaments(false);
+      })
+      .catch((e) => {
+        showErrorDialog([e instanceof Error ? e.message : e]);
+        setGettingAdminedTournaments(false);
+      });
+  }, []);
 
   const [slugDialogOpen, setSlugDialogOpen] = useState(false);
   const [gettingTournament, setGettingTournament] = useState(false);
@@ -73,7 +96,7 @@ function IndexPage() {
 
     setGettingTournament(true);
     try {
-      let tournament = window.electron.getStartggTournament(maybeSlug);
+      let tournament = await window.electron.getStartggTournament(maybeSlug);
       setGettingTournament(false);
       return tournament;
     } catch (e: any) {
@@ -87,7 +110,7 @@ function IndexPage() {
         gettingTournament={gettingTournament}
         setGettingTournament={setGettingTournament}
         startggTournament={startggTournament}
-        close={() => {}}
+        showErrorDialog={showErrorDialog}
       />
 
       <ErrorDialog
@@ -100,6 +123,7 @@ function IndexPage() {
       />
 
       <Settings
+        loggedInStatus={loggedInStatus}
         slugDialogOpen={slugDialogOpen}
         gettingTournament={gettingTournament}
         startggTournament={startggTournament}
@@ -107,7 +131,6 @@ function IndexPage() {
         gettingAdminedTournaments={gettingAdminedTournaments}
         setSlugDialogOpen={setSlugDialogOpen}
         setGettingTournament={setGettingTournament}
-        setAdminedTournaments={setAdminedTournaments}
         setGettingAdminedTournaments={setGettingAdminedTournaments}
         showErrorDialog={showErrorDialog}
         getStartggTournament={getStartggTournament}
