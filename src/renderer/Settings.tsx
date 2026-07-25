@@ -21,6 +21,7 @@ import {
 import { useEffect, useState } from 'react';
 import { AdminedTournament, Tournament } from '../common/types';
 import StartggTournamentSelectorForm from './StartggTournamentSelectorForm';
+import { start } from 'repl';
 
 export default function Settings({
   loggedInStatus,
@@ -90,11 +91,16 @@ export default function Settings({
           </Button>
         ) : (
           <DialogContent sx={{ pt: 0 }}>
-            <Stack direction="row">
+            <Stack
+              direction="row"
+              style={{
+                padding: '8px',
+              }}
+            >
               <InputBase
                 disabled
                 size="small"
-                value={startggTournament.slug || 'Set start.gg tournament...'}
+                value={startggTournament?.slug || 'Set start.gg tournament...'}
                 style={{ flexGrow: 1 }}
               />
               <Tooltip arrow title="Set start.gg tournament">

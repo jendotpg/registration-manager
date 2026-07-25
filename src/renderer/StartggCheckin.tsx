@@ -18,7 +18,7 @@ const NAME_COL_WIDTH = '15%';
 const VENUE_COL_WIDTH = '10%';
 const EVENT_COL_WIDTH = '13%';
 
-export default function StartggCheckinForm({
+export default function StartggCheckin({
   gettingTournament,
   startggTournament,
   setGettingTournament,
@@ -52,6 +52,10 @@ export default function StartggCheckinForm({
         justifyContent="space-between"
         margin="16px"
         padding="8px"
+        sx={{
+          overflow: 'auto',
+          maxHeight: '10vh',
+        }}
       >
         <Typography sx={{ padding: 0 }}>{startggTournament.name}</Typography>
         <Tooltip arrow title="Refresh">
@@ -75,7 +79,7 @@ export default function StartggCheckinForm({
       <Stack
         sx={{
           overflow: 'auto',
-          maxHeight: 'calc(80vh - 140px)',
+          maxHeight: '85vh',
         }}
       >
         <Stack sx={{ minWidth: tableMinWidth }}>

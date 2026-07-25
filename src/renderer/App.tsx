@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import { GlobalHotKeys } from 'react-hotkeys';
 import { AdminedTournament, Tournament } from '../common/types';
 import Settings from './Settings';
-import StartggCheckinForm from './StartggCheckinForm';
+import StartggCheckin from './StartggCheckin';
 import { WindowEvent } from './setWindowEventListener';
 import ErrorDialog from './ErrorDialog';
 
@@ -13,7 +13,6 @@ import ErrorDialog from './ErrorDialog';
 //TODO: add copy feature
 //TODO: add filter feature for each checkbox
 //TODO: add search bar
-//TODO: get rid of the weird white box at the bottom of main
 //TODO: make main/startgg.ts:getTournament() use the unofficial api - so that it works on private events too :)
 //TODO: show scrollbars
 //TODO: fix key uniqueness issue
@@ -106,7 +105,7 @@ function IndexPage() {
 
   return (
     <>
-      <StartggCheckinForm
+      <StartggCheckin
         gettingTournament={gettingTournament}
         setGettingTournament={setGettingTournament}
         startggTournament={startggTournament}

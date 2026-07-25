@@ -53,28 +53,7 @@ export default function StartggTournamentSelectorForm({
 
   return (
     <>
-      <Stack
-        alignItems="center"
-        direction="row"
-        justifyContent="space-between"
-        marginRight="16px"
-      >
-        <DialogTitle>Set start.gg tournament</DialogTitle>
-        {gettingAdminedTournaments ? (
-          <CircularProgress size="24px" style={{ padding: '8px' }} />
-        ) : (
-          <Tooltip arrow title="Refresh">
-            <IconButton
-              onClick={() => {
-                window.electron.getAdminedTournaments();
-              }}
-            >
-              <Refresh />
-            </IconButton>
-          </Tooltip>
-        )}
-      </Stack>
-      <DialogContent sx={{ pl: 0, pr: 0, pt: 0 }}>
+      <DialogContent sx={{ pl: 2, pr: 2, pt: 2 }}>
         <form
           style={{
             alignItems: 'center',
@@ -82,16 +61,7 @@ export default function StartggTournamentSelectorForm({
             margin: '8px 24px',
             gap: '8px',
           }}
-          onSubmit={async () => {
-            try {
-              setGettingAdminedTournaments(true);
-              await window.electron.getAdminedTournaments();
-            } catch (e: any) {
-              showErrorDialog([e instanceof Error ? e.message : e]);
-            } finally {
-              setGettingAdminedTournaments(false);
-            }
-          }}
+          onSubmit={getTournamentOnSubmit}
         >
           <TextField
             label="Tournament Slug"
@@ -108,6 +78,25 @@ export default function StartggTournamentSelectorForm({
           >
             Get!
           </Button>
+          {gettingAdminedTournaments ? (
+            <CircularProgress size="24px" style={{ padding: '8px' }} />
+          ) : (
+            <Tooltip arrow title="Get tournaments">
+              <IconButton
+                style={{
+                  marginLeft: 'auto',
+                }}
+                onClick={() => {
+                  setGettingAdminedTournaments(true);
+                  window.electron.getAdminedTournaments().then(() => {
+                    setGettingAdminedTournaments(false);
+                  });
+                }}
+              >
+                <Refresh />
+              </IconButton>
+            </Tooltip>
+          )}
         </form>
         {gettingAdminedTournaments && adminedTournaments.length === 0 ? (
           <Stack direction="row" margin="8px 24px" spacing="8px">
