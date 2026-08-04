@@ -7,16 +7,13 @@ import StartggCheckin from './StartggCheckin';
 import { WindowEvent } from './setWindowEventListener';
 import ErrorDialog from './ErrorDialog';
 
-//TODO: grey out "added" checkbox if event has any sets reported
-//TODO: grey out "paid" checkbox on free events
-//TODO: when selecting "paid" checkbox if user hasnt been added to event, also add them!
+//TODO: add search bar
 //TODO: add copy feature
 //TODO: add filter feature for each checkbox
-//TODO: add search bar
+//TODO: when selecting "paid" checkbox if user hasnt been added to event, also add them!
 //TODO: make main/startgg.ts:getTournament() use the unofficial api - so that it works on private events too :)
 //TODO: show scrollbars
 //TODO: fix key uniqueness issue
-//TODO: make the tournament selector a bit prettier (bounding box?)
 
 function IndexPage() {
   const [loggedInStatus, setLoggedInStatus] = useState<boolean>(false);
@@ -42,16 +39,6 @@ function IndexPage() {
     participants: [],
     updatingCheckboxes: [],
   });
-
-  useEffect(() => {
-    const inner = async () => {
-      const currentTournament = await window.electron.getCurrentTournament();
-      if (currentTournament) {
-        setStartggTournament(currentTournament);
-      }
-    };
-    inner();
-  }, []);
 
   useEffect(() => {
     window.electron.onLoggedInStatus((e, { loggedInStatus }) => {

@@ -118,14 +118,18 @@ async function fetchUnofficialGql(
   return json.data;
 }
 
-const GQL_GET_REGISTRATION = `
-query TournamentAttendees(
+const GQL_GET_EVENTS = `
+query TournamentEvents(
   $tournamentSlug: String
   $page: Int = 1
   $perPage: Int = 100
   $sortBy: String = "id DESC"
 ) {
   tournamentRegistrationInfo: tournament(slug: $tournamentSlug) {
+    events {
+      id
+      state
+    }
     registrationOptions {
       name
       id
@@ -134,8 +138,21 @@ query TournamentAttendees(
         id
         name
         optionTypeId
+        fee
       }
     }
+  }
+}
+`;
+
+const GQL_GET_PARTICIPANTS = `
+query TournamentParticipants(
+  $tournamentSlug: String
+  $page: Int = 1
+  $perPage: Int = 100
+  $sortBy: String = "id DESC"
+) {
+  tournamentRegistrationInfo: tournament(slug: $tournamentSlug) {
     participants(
       query: { page: $page, perPage: $perPage, sortBy: $sortBy }
     ) {
@@ -161,40 +178,51 @@ query TournamentAttendees(
   }
 }
 `;
-export function ingestRegistration(
+export function ingestEvents(
   queryResponse: { [x: string]: any },
-  participants: Participant[],
   registrationOptions: RegistrationOption[],
-  participantPaidStatuses: Record<Id, Record<number, boolean>>,
-  participantRegisteredStatuses: Record<Id, Record<number, boolean>>,
 ) {
+  const startedEvents = [];
+
+  for (let rawEvent of queryResponse['tournamentRegistrationInfo']['events']) {
+    if (rawEvent['state'] != 'CREATED' && rawEvent['state'] != 'READY') {
+      startedEvents.push(rawEvent['id']);
+    }
+  }
+
   registrationOptions.length = 0;
   for (let rawRegistrationOption of queryResponse['tournamentRegistrationInfo'][
     'registrationOptions'
   ]) {
+    let id = undefined;
     if (rawRegistrationOption['optionType'] == 'tournament') {
-      venueFeeOption = rawRegistrationOption['values'][0]['id'];
-
-      registrationOptions.push({
-        id: rawRegistrationOption['values'][0]['id'],
-        name: rawRegistrationOption['name'],
-        type: rawRegistrationOption['optionType'],
-        options: rawRegistrationOption['values'].map(
-          (value: Record<string, string>) => value['name'],
-        ),
-      });
+      id = rawRegistrationOption['values'][0]['id'];
+      venueFeeOption = id;
     } else if (rawRegistrationOption['optionType'] == 'event') {
-      registrationOptions.push({
-        id: rawRegistrationOption['values'][0]['optionTypeId'],
-        name: rawRegistrationOption['name'],
-        type: rawRegistrationOption['optionType'],
-        options: rawRegistrationOption['values'].map(
-          (value: Record<string, string>) => value['name'],
-        ),
-      });
+      id = rawRegistrationOption['values'][0]['optionTypeId'];
     }
-  }
 
+    id
+      ? registrationOptions.push({
+          id: id,
+          name: rawRegistrationOption['name'],
+          type: rawRegistrationOption['optionType'],
+          started: startedEvents.includes(id),
+          free: rawRegistrationOption['values'][0]['fee'] == 0,
+          options: rawRegistrationOption['values'].map(
+            (value: Record<string, string>) => value['name'],
+          ),
+        })
+      : {};
+  }
+}
+
+export function ingestParticipants(
+  queryResponse: { [x: string]: any },
+  participants: Participant[],
+  participantPaidStatuses: Record<Id, Record<number, boolean>>,
+  participantRegisteredStatuses: Record<Id, Record<number, boolean>>,
+) {
   for (let rawParticipantNode of queryResponse['tournamentRegistrationInfo'][
     'participants'
   ]['nodes']) {
@@ -234,43 +262,46 @@ export async function getRegistration(cookies: Cookie[], slugOrShort: string) {
   let participantPaidStatuses: Record<Id, Record<number, boolean>> = {};
   let participantRegisteredStatuses: Record<Id, Record<number, boolean>> = {};
 
-  let registrationQuery = await fetchUnofficialGql(
+  let eventsQuery = await fetchUnofficialGql(cookies, GQL_GET_EVENTS, {
+    tournamentSlug: slugOrShort,
+  });
+  ingestEvents(eventsQuery, registrationOptions);
+
+  let participantsQuery = await fetchUnofficialGql(
     cookies,
-    GQL_GET_REGISTRATION,
+    GQL_GET_PARTICIPANTS,
     {
       tournamentSlug: slugOrShort,
     },
   );
-  ingestRegistration(
-    registrationQuery,
+  ingestParticipants(
+    participantsQuery,
     participants,
-    registrationOptions,
     participantPaidStatuses,
     participantRegisteredStatuses,
   );
   while (
-    registrationQuery['tournamentRegistrationInfo']['participants']['pageInfo'][
+    participantsQuery['tournamentRegistrationInfo']['participants']['pageInfo'][
       'totalPages'
     ] >
-    registrationQuery['tournamentRegistrationInfo']['participants']['pageInfo'][
+    participantsQuery['tournamentRegistrationInfo']['participants']['pageInfo'][
       'page'
     ]
   ) {
-    registrationQuery = await fetchUnofficialGql(
+    participantsQuery = await fetchUnofficialGql(
       cookies,
-      GQL_GET_REGISTRATION,
+      GQL_GET_PARTICIPANTS,
       {
         tournamentSlug: slugOrShort,
         page:
-          registrationQuery['tournamentRegistrationInfo']['participants'][
+          participantsQuery['tournamentRegistrationInfo']['participants'][
             'pageInfo'
           ]['page'] + 1,
       },
     );
-    ingestRegistration(
-      registrationQuery,
+    ingestParticipants(
+      participantsQuery,
       participants,
-      registrationOptions,
       participantPaidStatuses,
       participantRegisteredStatuses,
     );
@@ -386,11 +417,7 @@ export async function updateParticipantRegistration(
   });
 }
 
-export async function toggleParticipantPaid(
-  cookies: Cookie[],
-  attendee: Id,
-  option: any,
-) {
+export async function toggleParticipantPaid(attendee: Id, option: any) {
   if (currentTournament == undefined || venueFeeOption == undefined) {
     return;
   }

@@ -14,9 +14,9 @@ import {
 } from '@mui/material';
 import { Refresh } from '@mui/icons-material';
 
-const NAME_COL_WIDTH = '15%';
-const VENUE_COL_WIDTH = '10%';
-const EVENT_COL_WIDTH = '13%';
+const NAME_COL_WIDTH = '22%';
+const VENUE_COL_WIDTH = '12%';
+const EVENT_COL_WIDTH = '18%';
 
 export default function StartggCheckin({
   gettingTournament,
@@ -86,7 +86,7 @@ export default function StartggCheckin({
           <Stack
             direction="row"
             alignItems="center"
-            spacing="32px"
+            spacing="8px"
             padding="0 24px"
             sx={{
               position: 'sticky',
@@ -150,13 +150,13 @@ export default function StartggCheckin({
                     key={tournamentParticipant.id}
                     direction="row"
                     alignItems="center"
-                    spacing="32px"
+                    spacing="8px"
                     padding="4px 24px"
                   >
                     <Tooltip
                       title={
                         (tournamentParticipant.prefix
-                          ? tournamentParticipant.prefix + '|'
+                          ? tournamentParticipant.prefix + ' | '
                           : '') +
                         tournamentParticipant.displayName +
                         ' (' +
@@ -178,7 +178,7 @@ export default function StartggCheckin({
                         }}
                       >
                         {(tournamentParticipant.prefix
-                          ? tournamentParticipant.prefix + '|'
+                          ? tournamentParticipant.prefix + ' | '
                           : '') + tournamentParticipant.displayName}
                       </Typography>
                     </Tooltip>
@@ -187,44 +187,53 @@ export default function StartggCheckin({
                         registrationOption.type == 'tournament' ? (
                           <Stack
                             alignItems="center"
-                            sx={{ width: VENUE_COL_WIDTH, flexShrink: 0 }}
+                            sx={{
+                              width: VENUE_COL_WIDTH,
+                              flexShrink: 0,
+                            }}
                           >
                             <Tooltip
                               title={
                                 (tournamentParticipant.prefix
-                                  ? tournamentParticipant.prefix + '|'
+                                  ? tournamentParticipant.prefix + ' | '
                                   : '') +
                                 tournamentParticipant.displayName +
                                 ' — ' +
                                 registrationOption.name +
-                                ' — Paid'
+                                (registrationOption.free
+                                  ? ' — FREE'
+                                  : ' — Paid')
                               }
                             >
-                              <Checkbox
-                                disabled={startggTournament.updatingCheckboxes.includes(
-                                  tournamentParticipant.id +
-                                    ';' +
-                                    registrationOption.id,
-                                )}
-                                edge="end"
-                                checked={
-                                  !!startggTournament.participantPaidStatuses[
-                                    tournamentParticipant.id
-                                  ]?.[registrationOption.id]
-                                }
-                                onClick={async () => {
-                                  try {
-                                    await window.electron.toggleParticipantPaid(
-                                      tournamentParticipant.id,
-                                      registrationOption.id,
-                                    );
-                                  } catch (e: any) {
-                                    showErrorDialog([
-                                      e instanceof Error ? e.message : e,
-                                    ]);
+                              <span>
+                                <Checkbox
+                                  disabled={
+                                    startggTournament.updatingCheckboxes.includes(
+                                      tournamentParticipant.id +
+                                        ';' +
+                                        registrationOption.id,
+                                    ) || registrationOption.free
                                   }
-                                }}
-                              />
+                                  edge="end"
+                                  checked={
+                                    !!startggTournament.participantPaidStatuses[
+                                      tournamentParticipant.id
+                                    ]?.[registrationOption.id]
+                                  }
+                                  onClick={async () => {
+                                    try {
+                                      await window.electron.toggleParticipantPaid(
+                                        tournamentParticipant.id,
+                                        registrationOption.id,
+                                      );
+                                    } catch (e: any) {
+                                      showErrorDialog([
+                                        e instanceof Error ? e.message : e,
+                                      ]);
+                                    }
+                                  }}
+                                />
+                              </span>
                             </Tooltip>
                           </Stack>
                         ) : (
@@ -233,84 +242,99 @@ export default function StartggCheckin({
                             direction="row"
                             spacing="4px"
                             justifyContent="center"
-                            sx={{ width: EVENT_COL_WIDTH, flexShrink: 0 }}
+                            sx={{
+                              width: EVENT_COL_WIDTH,
+                              flexShrink: 0,
+                            }}
                           >
                             <Tooltip
                               title={
                                 (tournamentParticipant.prefix
-                                  ? tournamentParticipant.prefix + '|'
+                                  ? tournamentParticipant.prefix + ' | '
                                   : '') +
                                 tournamentParticipant.displayName +
                                 ' — ' +
                                 registrationOption.name +
-                                ' — Paid'
+                                (registrationOption.free
+                                  ? ' — FREE'
+                                  : ' — Paid')
                               }
                             >
-                              <Checkbox
-                                disabled={startggTournament.updatingCheckboxes.includes(
-                                  tournamentParticipant.id +
-                                    ';' +
-                                    registrationOption.id,
-                                )}
-                                size="small"
-                                edge="end"
-                                checked={
-                                  !!startggTournament.participantPaidStatuses[
-                                    tournamentParticipant.id
-                                  ]?.[registrationOption.id]
-                                }
-                                onClick={async () => {
-                                  try {
-                                    await window.electron.toggleParticipantPaid(
-                                      tournamentParticipant.id,
-                                      registrationOption.id,
-                                    );
-                                  } catch (e: any) {
-                                    showErrorDialog([
-                                      e instanceof Error ? e.message : e,
-                                    ]);
+                              <span>
+                                <Checkbox
+                                  disabled={
+                                    startggTournament.updatingCheckboxes.includes(
+                                      tournamentParticipant.id +
+                                        ';' +
+                                        registrationOption.id,
+                                    ) || registrationOption.free
                                   }
-                                }}
-                              />
+                                  size="small"
+                                  edge="end"
+                                  checked={
+                                    !!startggTournament.participantPaidStatuses[
+                                      tournamentParticipant.id
+                                    ]?.[registrationOption.id]
+                                  }
+                                  onClick={async () => {
+                                    try {
+                                      await window.electron.toggleParticipantPaid(
+                                        tournamentParticipant.id,
+                                        registrationOption.id,
+                                      );
+                                    } catch (e: any) {
+                                      showErrorDialog([
+                                        e instanceof Error ? e.message : e,
+                                      ]);
+                                    }
+                                  }}
+                                />
+                              </span>
                             </Tooltip>
                             <Tooltip
                               title={
-                                (tournamentParticipant.prefix
-                                  ? tournamentParticipant.prefix + '|'
-                                  : '') +
-                                tournamentParticipant.displayName +
-                                ' — ' +
-                                registrationOption.name +
-                                ' — Added'
+                                registrationOption.started
+                                  ? 'EVENT STARTED'
+                                  : (tournamentParticipant.prefix
+                                      ? tournamentParticipant.prefix + ' | '
+                                      : '') +
+                                    tournamentParticipant.displayName +
+                                    ' — ' +
+                                    registrationOption.name +
+                                    ' — Added'
                               }
                             >
-                              <Checkbox
-                                disabled={startggTournament.updatingCheckboxes.includes(
-                                  tournamentParticipant.id +
-                                    ';' +
-                                    registrationOption.id,
-                                )}
-                                size="small"
-                                edge="end"
-                                checked={
-                                  !!startggTournament
-                                    .participantRegisteredStatuses[
-                                    tournamentParticipant.id
-                                  ]?.[registrationOption.id]
-                                }
-                                onClick={async () => {
-                                  try {
-                                    await window.electron.toggleParticipantAdded(
-                                      tournamentParticipant.id,
-                                      registrationOption.id,
-                                    );
-                                  } catch (e: any) {
-                                    showErrorDialog([
-                                      e instanceof Error ? e.message : e,
-                                    ]);
+                              <span>
+                                <Checkbox
+                                  disabled={
+                                    startggTournament.updatingCheckboxes.includes(
+                                      tournamentParticipant.id +
+                                        ';' +
+                                        registrationOption.id,
+                                    ) || registrationOption.started
                                   }
-                                }}
-                              />
+                                  size="small"
+                                  edge="end"
+                                  checked={
+                                    !!startggTournament
+                                      .participantRegisteredStatuses[
+                                      tournamentParticipant.id
+                                    ]?.[registrationOption.id]
+                                  }
+                                  onClick={async () => {
+                                    try {
+                                      await window.electron.toggleParticipantAdded(
+                                        tournamentParticipant.id,
+                                        registrationOption.id,
+                                      );
+                                    } catch (e: any) {
+                                      showErrorDialog([
+                                        e instanceof Error ? e.message : e,
+                                      ]);
+                                    }
+                                  }}
+                                />
+                              </span>
                             </Tooltip>
                           </Stack>
                         ),

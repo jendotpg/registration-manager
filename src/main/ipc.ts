@@ -93,7 +93,7 @@ export default function setupIPCs(mainWindow: BrowserWindow): void {
   ipcMain.handle(
     'toggleParticipantPaid',
     async (event, attendee: Id, option: Id) => {
-      await toggleParticipantPaid(startggCookies, attendee, option);
+      await toggleParticipantPaid(attendee, option);
 
       mainWindow.webContents.send('tournament', {
         startggTournament: getCurrentTournament(),

@@ -10,6 +10,8 @@ export type RegistrationOption = {
   id: number;
   name: string;
   type: string;
+  started: boolean;
+  free: boolean;
   options: string[];
 };
 
@@ -18,8 +20,8 @@ export type Tournament = {
   name: string;
   participants: Participant[];
   registrationOptions: RegistrationOption[];
-  participantPaidStatuses: Record<number, Record<number, boolean>>;
-  participantRegisteredStatuses: Record<Id, Record<number, boolean>>;
+  participantPaidStatuses: Record<Id, Record<Id, boolean>>;
+  participantRegisteredStatuses: Record<Id, Record<Id, boolean>>;
   updatingCheckboxes: string[];
 };
 
