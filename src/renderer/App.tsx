@@ -20,6 +20,8 @@ import { electron } from 'process';
 //TODO: fix filter spacing ugh
 //TODO: fix key uniqueness issue
 //TODO: improve teams handling
+//TODO: fix building!! we're hardcoding the fucking python path LMFAOOO
+//TODO: make "failed to log in" not error the first time...
 //TODO: make background of upper sticky work correctly when theres too many events to fit in 100% (use garden brawl as an example)
 
 function IndexPage() {
@@ -112,10 +114,7 @@ function IndexPage() {
     for (const event in paidFilters) {
       if (
         paidFilters[event] &&
-        (startggTournament.participantPaidStatuses[participant.id][event] ==
-          false ||
-          startggTournament.participantPaidStatuses[participant.id][event] ==
-            undefined)
+        startggTournament.participantPaidStatuses[participant.id][event] == true
       ) {
         return false;
       }
