@@ -22,6 +22,8 @@ const electronHandler = {
     ipcRenderer.invoke('toggleParticipantPaid', attendee, option),
   toggleParticipantAdded: (attendee: Id, option: Id) =>
     ipcRenderer.invoke('toggleParticipantAdded', attendee, option),
+  copyToClipboard: (clipboardValue: string): Promise<void> =>
+    ipcRenderer.invoke('copyToClipboard', clipboardValue),
 
   onLoggedInStatus: (
     callback: (

@@ -1,9 +1,4 @@
-import {
-  RegistrationOption,
-  Participant,
-  Tournament,
-  Id,
-} from '../common/types';
+import { Participant, Tournament, Id } from '../common/types';
 import {
   CircularProgress,
   Checkbox,
@@ -11,29 +6,53 @@ import {
   Stack,
   Tooltip,
   Typography,
+  TextField,
 } from '@mui/material';
-import { Refresh } from '@mui/icons-material';
+import {
+  Refresh,
+  FilterList,
+  FilterListOff,
+  ContentCopy,
+} from '@mui/icons-material';
+import { useState } from 'react';
 
 const NAME_COL_WIDTH = '22%';
 const VENUE_COL_WIDTH = '12%';
-const EVENT_COL_WIDTH = '18%';
+const EVENT_COL_WIDTH_MIN = '12%';
 
 export default function StartggCheckin({
-  gettingTournament,
   startggTournament,
+  applyFilters,
+  copyFilteredParticipants,
+  gettingTournament,
+  searchText,
+  paidFilters,
+  addedFilters,
   setGettingTournament,
+  setSearchText,
+  setPaidFilters,
+  setAddedFilters,
   showErrorDialog,
 }: {
-  gettingTournament: boolean;
   startggTournament: Tournament;
+  applyFilters: (val: Participant) => boolean;
+  copyFilteredParticipants: () => void;
+  gettingTournament: boolean;
+  searchText: string;
+  paidFilters: Record<Id, boolean>;
+  addedFilters: Record<Id, boolean>;
   setGettingTournament: (val: boolean) => void;
+  setSearchText: (val: string) => void;
+  setPaidFilters: (val: Record<Id, boolean>) => void;
+  setAddedFilters: (val: Record<Id, boolean>) => void;
   showErrorDialog: (errors: string[]) => void;
 }) {
   const tableMinWidth = `calc(${NAME_COL_WIDTH} + ${VENUE_COL_WIDTH} + ${
     startggTournament.registrationOptions.length
-  } * ${EVENT_COL_WIDTH} + ${
+  } * ${`max(${EVENT_COL_WIDTH_MIN}, calc(55% / ${startggTournament.registrationOptions.length}))`} + ${
     (startggTournament.registrationOptions.length + 1) * 32
   }px)`;
+
   return startggTournament.slug == '' ? (
     <Stack
       direction="row"
@@ -50,17 +69,21 @@ export default function StartggCheckin({
         direction="row"
         alignItems="center"
         justifyContent="space-between"
-        margin="16px"
-        padding="8px"
+        margin="4px"
+        padding="4px"
         sx={{
           overflow: 'auto',
-          maxHeight: '10vh',
+          minHeight: '6vh',
+          maxHeight: '6vh',
         }}
       >
         <Typography sx={{ padding: 0 }}>{startggTournament.name}</Typography>
         <Tooltip arrow title="Refresh">
           <IconButton
             onClick={async () => {
+              setSearchText('');
+              setPaidFilters({});
+              setAddedFilters({});
               try {
                 await window.electron.getStartggTournament(
                   startggTournament.slug,
@@ -79,7 +102,7 @@ export default function StartggCheckin({
       <Stack
         sx={{
           overflow: 'auto',
-          maxHeight: '85vh',
+          maxHeight: '95vh',
         }}
       >
         <Stack sx={{ minWidth: tableMinWidth }}>
@@ -95,45 +118,165 @@ export default function StartggCheckin({
               backgroundColor: 'background.paper',
               borderBottom: '1px solid',
               borderColor: 'divider',
+              padding: '8px',
+              margin: '4px',
             }}
           >
-            <Typography
-              noWrap
+            <Stack
+              direction="row"
               sx={{
-                width: NAME_COL_WIDTH,
-                flexShrink: 0,
-                fontWeight: 'bold',
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
                 position: 'sticky',
                 left: 0,
                 zIndex: 3,
-                backgroundColor: 'background.paper',
+                width: NAME_COL_WIDTH,
+                'min-width': NAME_COL_WIDTH,
+                backgroundColor: 'white',
               }}
             >
-              Name
-            </Typography>
+              <TextField
+                label="Search players"
+                id="search-bar"
+                name="search-bar"
+                placeholder="TSM|Leffen"
+                value={searchText}
+                onChange={(event) => {
+                  setSearchText(event.target.value);
+                }}
+                size="small"
+                variant="outlined"
+                sx={{
+                  width: '85%',
+                }}
+              />
+              <IconButton
+                onClick={copyFilteredParticipants}
+                sx={{
+                  width: '15%',
+                }}
+              >
+                <ContentCopy />
+              </IconButton>
+            </Stack>
 
             {startggTournament.registrationOptions.map((registrationOption) => (
-              <Tooltip title={registrationOption.name}>
-                <Typography
-                  key={`${registrationOption.id}-name`}
-                  noWrap
-                  align="center"
-                  sx={{
-                    width:
-                      registrationOption.type == 'tournament'
-                        ? VENUE_COL_WIDTH
-                        : EVENT_COL_WIDTH,
-                    flexShrink: 0,
-                    fontWeight: 'bold',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                  }}
-                >
-                  {registrationOption.name}
-                </Typography>
-              </Tooltip>
+              <Stack
+                sx={{
+                  width:
+                    registrationOption.type == 'tournament'
+                      ? VENUE_COL_WIDTH
+                      : `max(${EVENT_COL_WIDTH_MIN}, calc(55% / ${startggTournament.registrationOptions.length}))`,
+                  zIndex: 3,
+                  flexShrink: 0,
+                }}
+              >
+                <Tooltip title={registrationOption.name}>
+                  <Typography
+                    key={`${registrationOption.id}-name`}
+                    noWrap
+                    align="center"
+                    sx={{
+                      fontWeight: 'bold',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                    }}
+                  >
+                    {registrationOption.name}
+                  </Typography>
+                </Tooltip>
+
+                {registrationOption.type == 'tournament' ? (
+                  <Stack
+                    direction="row"
+                    justifyContent="center"
+                    spacing="4px"
+                    sx={{
+                      width: '100%',
+                      'min-width': '100%',
+                    }}
+                  >
+                    {paidFilters[registrationOption.id] ? (
+                      <IconButton
+                        onClick={async () => {
+                          setPaidFilters({
+                            ...paidFilters,
+                            [registrationOption.id]: false,
+                          });
+                        }}
+                      >
+                        <FilterListOff />
+                      </IconButton>
+                    ) : (
+                      <IconButton
+                        onClick={async () => {
+                          setPaidFilters({
+                            ...paidFilters,
+                            [registrationOption.id]: true,
+                          });
+                        }}
+                      >
+                        <FilterList />
+                      </IconButton>
+                    )}
+                  </Stack>
+                ) : (
+                  <Stack
+                    direction="row"
+                    justifyContent="center"
+                    spacing="0px"
+                    sx={{
+                      width: '100%',
+                      'min-width': '100%',
+                    }}
+                  >
+                    {paidFilters[registrationOption.id] ? (
+                      <IconButton
+                        onClick={async () => {
+                          setPaidFilters({
+                            ...paidFilters,
+                            [registrationOption.id]: false,
+                          });
+                        }}
+                      >
+                        <FilterListOff />
+                      </IconButton>
+                    ) : (
+                      <IconButton
+                        onClick={async () => {
+                          setPaidFilters({
+                            ...paidFilters,
+                            [registrationOption.id]: true,
+                          });
+                        }}
+                      >
+                        <FilterList />
+                      </IconButton>
+                    )}
+                    {addedFilters[registrationOption.id] ? (
+                      <IconButton
+                        onClick={async () => {
+                          setAddedFilters({
+                            ...addedFilters,
+                            [registrationOption.id]: false,
+                          });
+                        }}
+                      >
+                        <FilterListOff />
+                      </IconButton>
+                    ) : (
+                      <IconButton
+                        onClick={async () => {
+                          setAddedFilters({
+                            ...addedFilters,
+                            [registrationOption.id]: true,
+                          });
+                        }}
+                      >
+                        <FilterList />
+                      </IconButton>
+                    )}
+                  </Stack>
+                )}
+              </Stack>
             ))}
           </Stack>
 
@@ -144,8 +287,9 @@ export default function StartggCheckin({
                 <Typography>Getting tournament attendees ...</Typography>
               </Stack>
             ) : (
-              startggTournament.participants.map(
-                (tournamentParticipant: Participant) => (
+              startggTournament.participants
+                .filter(applyFilters)
+                .map((tournamentParticipant: Participant) => (
                   <Stack
                     key={tournamentParticipant.id}
                     direction="row"
@@ -243,7 +387,7 @@ export default function StartggCheckin({
                             spacing="4px"
                             justifyContent="center"
                             sx={{
-                              width: EVENT_COL_WIDTH,
+                              width: `max(${EVENT_COL_WIDTH_MIN}, calc(55% / ${startggTournament.registrationOptions.length}))`,
                               flexShrink: 0,
                             }}
                           >
@@ -340,8 +484,7 @@ export default function StartggCheckin({
                         ),
                     )}
                   </Stack>
-                ),
-              )
+                ))
             )}
           </Stack>
         </Stack>

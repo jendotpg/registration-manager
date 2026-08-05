@@ -18,7 +18,6 @@ export default function ErrorDialog({
 }) {
   return (
     <Dialog open={open} onClose={onClose}>
-      <DialogTitle>Error! (You may want to copy this message)</DialogTitle>
       <DialogContent>
         {messages.map((message, i) => (
           // eslint-disable-next-line react/no-array-index-key

@@ -1,4 +1,4 @@
-import { BrowserWindow, Cookie, ipcMain, session } from 'electron';
+import { BrowserWindow, Cookie, ipcMain, session, clipboard } from 'electron';
 import Store from 'electron-store';
 import {
   getTournament,
@@ -136,4 +136,9 @@ export default function setupIPCs(mainWindow: BrowserWindow): void {
       });
     },
   );
+
+  ipcMain.removeHandler('copyToClipboard');
+  ipcMain.handle('copyToClipboard', async (event, clipboardValue: string) => {
+    clipboard.writeText(clipboardValue);
+  });
 }

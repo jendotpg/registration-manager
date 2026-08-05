@@ -1,19 +1,26 @@
 import { MemoryRouter as Router, Routes, Route } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import { GlobalHotKeys } from 'react-hotkeys';
-import { AdminedTournament, Tournament } from '../common/types';
+import {
+  AdminedTournament,
+  Id,
+  Participant,
+  Tournament,
+} from '../common/types';
 import Settings from './Settings';
 import StartggCheckin from './StartggCheckin';
 import { WindowEvent } from './setWindowEventListener';
 import ErrorDialog from './ErrorDialog';
+import { electron } from 'process';
 
-//TODO: add search bar
-//TODO: add copy feature
-//TODO: add filter feature for each checkbox
 //TODO: when selecting "paid" checkbox if user hasnt been added to event, also add them!
+//TODO: fetch tournaments on login
+//TODO: show licensing info!!! in particular note code usage from nicolet's replay manager for slippi - and check her licensing info to see if there's knock-on usage
 //TODO: make main/startgg.ts:getTournament() use the unofficial api - so that it works on private events too :)
-//TODO: show scrollbars
+//TODO: fix filter spacing ugh
 //TODO: fix key uniqueness issue
+//TODO: improve teams handling
+//TODO: make background of upper sticky work correctly when theres too many events to fit in 100% (use garden brawl as an example)
 
 function IndexPage() {
   const [loggedInStatus, setLoggedInStatus] = useState<boolean>(false);
@@ -90,12 +97,71 @@ function IndexPage() {
     }
   };
 
+  const [searchText, setSearchText] = useState('');
+  const [paidFilters, setPaidFilters] = useState<Record<Id, boolean>>({});
+  const [addedFilters, setAddedFilters] = useState<Record<Id, boolean>>({});
+
+  const applyFilters = (participant: Participant) => {
+    if (
+      !(participant.prefix + '|' + participant.displayName)
+        .toLowerCase()
+        .includes(searchText.toLowerCase())
+    ) {
+      return false;
+    }
+    for (const event in paidFilters) {
+      if (
+        paidFilters[event] &&
+        (startggTournament.participantPaidStatuses[participant.id][event] ==
+          false ||
+          startggTournament.participantPaidStatuses[participant.id][event] ==
+            undefined)
+      ) {
+        return false;
+      }
+      if (
+        addedFilters[event] &&
+        (startggTournament.participantRegisteredStatuses[participant.id][
+          event
+        ] == false ||
+          startggTournament.participantRegisteredStatuses[participant.id][
+            event
+          ] == undefined)
+      ) {
+        return false;
+      }
+    }
+    return true;
+  };
+
+  const copyFilteredParticipants = async () => {
+    const clipboardValue = startggTournament.participants
+      .filter(applyFilters)
+      .map((participant) => {
+        return participant.prefix
+          ? participant.prefix + '|' + participant.displayName
+          : participant.displayName;
+      })
+      .join(',');
+
+    window.electron.copyToClipboard(clipboardValue);
+    showErrorDialog(['Copied value!\n' + clipboardValue]);
+  };
+
   return (
     <>
       <StartggCheckin
-        gettingTournament={gettingTournament}
-        setGettingTournament={setGettingTournament}
         startggTournament={startggTournament}
+        applyFilters={applyFilters}
+        copyFilteredParticipants={copyFilteredParticipants}
+        gettingTournament={gettingTournament}
+        searchText={searchText}
+        paidFilters={paidFilters}
+        addedFilters={addedFilters}
+        setGettingTournament={setGettingTournament}
+        setSearchText={setSearchText}
+        setPaidFilters={setPaidFilters}
+        setAddedFilters={setAddedFilters}
         showErrorDialog={showErrorDialog}
       />
 
@@ -133,13 +199,13 @@ function IndexPage() {
         }}
         handlers={{
           COPY: () => {
-            showErrorDialog(['Copy not implemented yet!']);
+            copyFilteredParticipants();
           },
           ESC: () => {
             window.dispatchEvent(new Event(WindowEvent.ESCAPE));
           },
           FIND: () => {
-            showErrorDialog(['Find not implemented yet!']);
+            document?.getElementById('search-bar')?.focus();
           },
         }}
       />
