@@ -11,8 +11,8 @@ import Settings from './Settings';
 import StartggCheckin from './StartggCheckin';
 import { WindowEvent } from './setWindowEventListener';
 import ErrorDialog from './ErrorDialog';
-import { electron } from 'process';
 
+//TODO: fix the copy hotkey!!
 //TODO: when selecting "paid" checkbox if user hasnt been added to event, also add them!
 //TODO: fetch tournaments on login
 //TODO: show licensing info!!! in particular note code usage from nicolet's replay manager for slippi - and check her licensing info to see if there's knock-on usage
@@ -133,7 +133,7 @@ function IndexPage() {
     return true;
   };
 
-  const copyFilteredParticipants = async () => {
+  const copyFilteredParticipants = () => {
     const clipboardValue = startggTournament.participants
       .filter(applyFilters)
       .map((participant) => {
@@ -142,6 +142,8 @@ function IndexPage() {
           : participant.displayName;
       })
       .join(',');
+
+    console.log(startggTournament);
 
     window.electron.copyToClipboard(clipboardValue);
     showErrorDialog(['Copied value!\n' + clipboardValue]);
@@ -198,7 +200,8 @@ function IndexPage() {
         }}
         handlers={{
           COPY: () => {
-            copyFilteredParticipants();
+            // copyFilteredParticipants();
+            showErrorDialog(['Copy Hot-key is broken sorry....']);
           },
           ESC: () => {
             window.dispatchEvent(new Event(WindowEvent.ESCAPE));
