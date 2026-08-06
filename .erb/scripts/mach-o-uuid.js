@@ -10,9 +10,18 @@ exports.default = async function machOUuid(context) {
   const appName = context.packager.appInfo.productFilename;
   const appPath = `${appOutDir}/${appName}.app`;
   const executablePath = `${appPath}/Contents/MacOS/${appName}`;
-  const results = await PythonShell.run(`${__dirname}/mach-o-uuid.py`, {
-    args: [executablePath],
-  });
+  const pythonShellOptions = process.env.PYTHON_PATH
+    ? {
+        pythonPath: process.env.PYTHON_PATH,
+        args: [executablePath],
+      }
+    : {
+        args: [executablePath],
+      };
+  const results = await PythonShell.run(
+    `${__dirname}/mach-o-uuid.py`,
+    pythonShellOptions,
+  );
   console.log(results.join('\n'));
 
   await new Promise((resolve, reject) => {

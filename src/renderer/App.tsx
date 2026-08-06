@@ -12,17 +12,22 @@ import StartggCheckin from './StartggCheckin';
 import { WindowEvent } from './setWindowEventListener';
 import ErrorDialog from './ErrorDialog';
 
-//TODO: fix the copy hotkey!!
-//TODO: when selecting "paid" checkbox if user hasnt been added to event, also add them!
+//TODO: fix the menu... existing? wtf? thats so annoying?
 //TODO: fetch tournaments on login
-//TODO: show licensing info!!! in particular note code usage from nicolet's replay manager for slippi - and check her licensing info to see if there's knock-on usage
-//TODO: make main/startgg.ts:getTournament() use the unofficial api - so that it works on private events too :)
+//TODO: when a fetch fails, error "login out of date" and open log-in window (including the first time!)
+//TODO: fix the copy hotkey!!
+//TODO: fix when you refresh the page the added filter just ... doesnt work? but then if you filter by paid and then unfilter it works?
+//TODO: grey out "paid" checkbox if user hasnt been added to event
+//TODO: fix building!! we're hardcoding the fucking python path LMFAOOO. i also cant build x86 windows binaries. use github actions?
 //TODO: fix filter spacing ugh
 //TODO: fix key uniqueness issue
-//TODO: improve teams handling
-//TODO: fix building!! we're hardcoding the fucking python path LMFAOOO
-//TODO: make "failed to log in" not error the first time...
+//TODO: update paid / added filters to have dropdowns
+//TODO: add filter by pool column (dropdown)
+//TODO: add filter by DQ'd column (dropdown)
+//TODO: fix settings covering short names
 //TODO: make background of upper sticky work correctly when theres too many events to fit in 100% (use garden brawl as an example)
+//TODO: make main/startgg.ts:getTournament() use the unofficial api - so that it works on private events too :)
+//TODO: improve teams handling
 
 function IndexPage() {
   const [loggedInStatus, setLoggedInStatus] = useState<boolean>(false);
