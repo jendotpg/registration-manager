@@ -11,7 +11,6 @@ import {
 } from './startgg';
 import { openStartggLoginWindow } from './loginwindow';
 import { Id } from '../common/types';
-import { electron } from 'process';
 
 export default function setupIPCs(mainWindow: BrowserWindow): void {
   const store = new Store<{

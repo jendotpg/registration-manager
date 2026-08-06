@@ -58,6 +58,11 @@ const electronHandler = {
     ipcRenderer.removeAllListeners('tournament');
     ipcRenderer.on('tournament', callback);
   },
+  refreshTournament: (callback: (event: IpcRendererEvent) => void) => {
+    ipcRenderer.removeAllListeners('refreshTournament');
+    ipcRenderer.on('refreshTournament', callback);
+  },
+
   isMac: process.platform === 'darwin',
 };
 

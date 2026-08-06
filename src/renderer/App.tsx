@@ -1,5 +1,5 @@
 import { MemoryRouter as Router, Routes, Route } from 'react-router-dom';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { GlobalHotKeys } from 'react-hotkeys';
 import {
   AdminedTournament,
@@ -12,10 +12,9 @@ import StartggCheckin from './StartggCheckin';
 import { WindowEvent } from './setWindowEventListener';
 import ErrorDialog from './ErrorDialog';
 
-//TODO: fix the menu... existing? wtf? thats so annoying?
+//TODO: fix application quitting on last window close (mac)
 //TODO: fetch tournaments on login
 //TODO: when a fetch fails, error "login out of date" and open log-in window (including the first time!)
-//TODO: fix the copy hotkey!!
 //TODO: fix when you refresh the page the added filter just ... doesnt work? but then if you filter by paid and then unfilter it works?
 //TODO: grey out "paid" checkbox if user hasnt been added to event
 //TODO: fix building!! we're hardcoding the fucking python path LMFAOOO. i also cant build x86 windows binaries. use github actions?
@@ -24,6 +23,7 @@ import ErrorDialog from './ErrorDialog';
 //TODO: update paid / added filters to have dropdowns
 //TODO: add filter by pool column (dropdown)
 //TODO: add filter by DQ'd column (dropdown)
+//TODO: implement undo / redo tree
 //TODO: fix settings covering short names
 //TODO: make background of upper sticky work correctly when theres too many events to fit in 100% (use garden brawl as an example)
 //TODO: make main/startgg.ts:getTournament() use the unofficial api - so that it works on private events too :)
@@ -54,22 +54,38 @@ function IndexPage() {
     updatingCheckboxes: [],
   });
 
+  const startggTournamentRef = useRef(startggTournament);
+  useEffect(() => {
+    startggTournamentRef.current = startggTournament;
+  }, [startggTournament]);
+
   useEffect(() => {
     window.electron.onLoggedInStatus((e, { loggedInStatus }) => {
       setLoggedInStatus(loggedInStatus);
     });
-  }, [loggedInStatus]);
+  }, []);
 
   useEffect(() => {
     window.electron.onAdminedTournaments((e, { adminedTournaments }) => {
       setAdminedTournaments(adminedTournaments);
       setGettingAdminedTournaments(false);
     });
-  }, [adminedTournaments, gettingAdminedTournaments]);
+  }, []);
 
   useEffect(() => {
     window.electron.onTournament((e, { startggTournament: newTournament }) => {
       setStartggTournament(newTournament);
+    });
+  }, []);
+
+  useEffect(() => {
+    window.electron.refreshTournament((e) => {
+      if (startggTournament.slug) {
+        setGettingTournament(true);
+        window.electron
+          .getStartggTournament(startggTournament.slug)
+          .then(() => setGettingTournament(false));
+      }
     });
   }, [startggTournament]);
 
@@ -195,24 +211,28 @@ function IndexPage() {
       />
       <GlobalHotKeys
         keyMap={{
-          COPY: window.electron.isMac
-            ? ['command+c', 'command+C']
-            : ['ctrl+c', 'ctrl+C'],
           ESC: 'escape',
           FIND: window.electron.isMac
             ? ['command+f', 'command+F']
             : ['ctrl+f', 'ctrl+F'],
+          REFRESH: window.electron.isMac
+            ? ['command+r', 'command+R']
+            : ['ctrl+r', 'ctrl+R'],
         }}
         handlers={{
-          COPY: () => {
-            // copyFilteredParticipants();
-            showErrorDialog(['Copy Hot-key is broken sorry....']);
-          },
           ESC: () => {
             window.dispatchEvent(new Event(WindowEvent.ESCAPE));
           },
           FIND: () => {
             document?.getElementById('search-bar')?.focus();
+          },
+          REFRESH: () => {
+            if (startggTournamentRef.current.slug) {
+              setGettingTournament(true);
+              window.electron
+                .getStartggTournament(startggTournamentRef.current.slug)
+                .then(() => setGettingTournament(false));
+            }
           },
         }}
       />

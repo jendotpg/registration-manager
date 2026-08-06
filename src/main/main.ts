@@ -9,7 +9,7 @@
  * `./src/main.js` using webpack. This gives us some performance wins.
  */
 import path from 'path';
-import { app, BrowserWindow, shell } from 'electron';
+import { app, BrowserWindow, shell, Menu } from 'electron';
 import { EventEmitter } from 'events';
 import MenuBuilder from './menu';
 import { resolveHtmlPath, getAssetPath } from './util';
@@ -70,6 +70,58 @@ const installExtensions = async () => {
     .catch(console.log);
 };
 
+const createMenu = (mainWindow: BrowserWindow): void => {
+  if (process.platform !== 'darwin') {
+    Menu.setApplicationMenu(null);
+    return;
+  }
+
+  const template: Electron.MenuItemConstructorOptions[] = [
+    {
+      label: app.name,
+      submenu: [
+        { role: 'about' },
+        { type: 'separator' },
+        { role: 'services' },
+        { type: 'separator' },
+        { role: 'hide' },
+        { role: 'hideOthers' },
+        { role: 'unhide' },
+        { type: 'separator' },
+        { role: 'quit' },
+      ],
+    },
+    {
+      label: 'File',
+      submenu: [{ role: 'close' }],
+    },
+    {
+      label: 'Edit',
+      submenu: [{ role: 'copy' }, { role: 'paste' }],
+    },
+    {
+      label: 'View',
+      submenu: [
+        {
+          label: 'Reload',
+          click: async () => {
+            mainWindow.webContents.send('refreshTournament');
+          },
+        },
+        { type: 'separator' },
+        { role: 'togglefullscreen' },
+      ],
+    },
+    {
+      label: 'Window',
+      role: 'windowMenu',
+    },
+  ];
+
+  const menu = Menu.buildFromTemplate(template);
+  Menu.setApplicationMenu(menu);
+};
+
 const createWindow = async () => {
   if (isDebug) {
     await installExtensions();
@@ -82,12 +134,16 @@ const createWindow = async () => {
     width: 1024,
     height: 896,
     icon: getAssetPath('icon.png'),
+    autoHideMenuBar: true,
     webPreferences: {
+      devTools: false,
+
       preload: app.isPackaged
         ? path.join(__dirname, 'preload.js')
         : path.join(__dirname, '../../.erb/dll/preload.js'),
     },
   });
+  createMenu(mainWindow);
 
   mainWindow.loadURL(resolveHtmlPath('index.html'));
 

@@ -85,6 +85,7 @@ export default function StartggCheckin({
               setPaidFilters({});
               setAddedFilters({});
               try {
+                setGettingTournament(true);
                 await window.electron.getStartggTournament(
                   startggTournament.slug,
                 );
