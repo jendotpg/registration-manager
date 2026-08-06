@@ -7,7 +7,6 @@ import {
   toggleParticipantPaid,
   toggleParticipantAdded,
   updateParticipantRegistration,
-  getLastAuthenticatedRequestSucceeded,
 } from './startgg';
 import { openStartggLoginWindow } from './loginwindow';
 import { Id } from '../common/types';
@@ -61,31 +60,44 @@ export default function setupIPCs(mainWindow: BrowserWindow): void {
   ipcMain.removeHandler('getStartggTournament');
   ipcMain.handle('getStartggTournament', async (event, slugOrShort: string) => {
     if (!startggCookies) {
-      throw new Error('Please log into start.gg');
+      return undefined;
     }
 
     const tournament = await getTournament(startggCookies, slugOrShort);
 
-    mainWindow.webContents.send('tournament', {
-      startggTournament: getCurrentTournament(),
-    });
+    if (tournament == undefined) {
+      mainWindow.webContents.send('loggedInStatus', {
+        loggedInStatus: false,
+      });
+    } else {
+      mainWindow.webContents.send('tournament', {
+        startggTournament: getCurrentTournament(),
+      });
+    }
 
     return tournament;
   });
 
   ipcMain.removeHandler('getAdminedTournaments');
   ipcMain.handle('getAdminedTournaments', async () => {
-    return getAdminedTournaments(startggCookies).then(
-      async (adminedTournaments) => {
-        mainWindow.webContents.send('loggedInStatus', {
-          loggedInStatus: getLastAuthenticatedRequestSucceeded(),
-        });
-
+    return getAdminedTournaments(startggCookies)
+      .then(async (adminedTournaments) => {
+        if (adminedTournaments == undefined) {
+          mainWindow.webContents.send('loggedInStatus', {
+            loggedInStatus: false,
+          });
+        } else {
+          mainWindow.webContents.send('loggedInStatus', {
+            loggedInStatus: true,
+          });
+        }
         mainWindow.webContents.send('adminedTournaments', {
           adminedTournaments: adminedTournaments,
         });
-      },
-    );
+      })
+      .catch((e) => {
+        console.error(e);
+      });
   });
 
   ipcMain.removeHandler('toggleParticipantPaid');
@@ -97,17 +109,11 @@ export default function setupIPCs(mainWindow: BrowserWindow): void {
       mainWindow.webContents.send('tournament', {
         startggTournament: getCurrentTournament(),
       });
-      mainWindow.webContents.send('loggedInStatus', {
-        loggedInStatus: getLastAuthenticatedRequestSucceeded(),
-      });
 
       await updateParticipantRegistration(startggCookies, attendee, option);
 
       mainWindow.webContents.send('tournament', {
         startggTournament: getCurrentTournament(),
-      });
-      mainWindow.webContents.send('loggedInStatus', {
-        loggedInStatus: getLastAuthenticatedRequestSucceeded(),
       });
     },
   );
@@ -121,17 +127,11 @@ export default function setupIPCs(mainWindow: BrowserWindow): void {
       mainWindow.webContents.send('tournament', {
         startggTournament: getCurrentTournament(),
       });
-      mainWindow.webContents.send('loggedInStatus', {
-        loggedInStatus: getLastAuthenticatedRequestSucceeded(),
-      });
 
       await updateParticipantRegistration(startggCookies, attendee, option);
 
       mainWindow.webContents.send('tournament', {
         startggTournament: getCurrentTournament(),
-      });
-      mainWindow.webContents.send('loggedInStatus', {
-        loggedInStatus: getLastAuthenticatedRequestSucceeded(),
       });
     },
   );

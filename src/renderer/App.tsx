@@ -12,25 +12,28 @@ import StartggCheckin from './StartggCheckin';
 import { WindowEvent } from './setWindowEventListener';
 import ErrorDialog from './ErrorDialog';
 
-//TODO: fix application quitting on last window close (mac)
-//TODO: fetch tournaments on login
-//TODO: when a fetch fails, error "login out of date" and open log-in window (including the first time!)
+//TODO: update paid / added filters to have dropdowns
 //TODO: fix when you refresh the page the added filter just ... doesnt work? but then if you filter by paid and then unfilter it works?
+//TODO: add filter by pool column (dropdown)
+//TODO: add filter by DQ'd column (dropdown)
 //TODO: grey out "paid" checkbox if user hasnt been added to event
 //TODO: fix building!! we're hardcoding the fucking python path LMFAOOO. i also cant build x86 windows binaries. use github actions?
 //TODO: fix filter spacing ugh
 //TODO: fix key uniqueness issue
-//TODO: update paid / added filters to have dropdowns
-//TODO: add filter by pool column (dropdown)
-//TODO: add filter by DQ'd column (dropdown)
 //TODO: implement undo / redo tree
 //TODO: fix settings covering short names
 //TODO: make background of upper sticky work correctly when theres too many events to fit in 100% (use garden brawl as an example)
-//TODO: make main/startgg.ts:getTournament() use the unofficial api - so that it works on private events too :)
-//TODO: improve teams handling
+//TODO: offload filtering to worker thread (or main thread) - it slows down a LOT with big events...
+//TODO: improve teams handling?
+//TODO: reconsider login flow?
 
 function IndexPage() {
   const [loggedInStatus, setLoggedInStatus] = useState<boolean>(false);
+  const loggedInStatusRef = useRef(loggedInStatus);
+  useEffect(() => {
+    loggedInStatusRef.current = loggedInStatus;
+  }, [loggedInStatus]);
+
   const [errors, setErrors] = useState<string[]>([]);
   const [errorDialogOpen, setErrorDialogOpen] = useState(false);
   const showErrorDialog = (messages: string[]) => {
@@ -60,21 +63,43 @@ function IndexPage() {
   }, [startggTournament]);
 
   useEffect(() => {
-    window.electron.onLoggedInStatus((e, { loggedInStatus }) => {
-      setLoggedInStatus(loggedInStatus);
-    });
+    window.electron.onLoggedInStatus(
+      (e, { loggedInStatus: newLoggedInStatus }) => {
+        if (loggedInStatusRef.current != newLoggedInStatus) {
+          setGettingAdminedTournaments(true);
+          setLoggedInStatus(newLoggedInStatus);
+          if (newLoggedInStatus) {
+            window.electron
+              .getAdminedTournaments()
+              .then(() => {
+                setGettingAdminedTournaments(false);
+              })
+              .catch((e) => {
+                showErrorDialog([e instanceof Error ? e.message : e]);
+                setGettingAdminedTournaments(false);
+              });
+          } else {
+            window.electron.openStartggLoginWindow();
+          }
+        }
+      },
+    );
   }, []);
 
   useEffect(() => {
     window.electron.onAdminedTournaments((e, { adminedTournaments }) => {
-      setAdminedTournaments(adminedTournaments);
-      setGettingAdminedTournaments(false);
+      if (adminedTournaments != undefined) {
+        setAdminedTournaments(adminedTournaments);
+        setGettingAdminedTournaments(false);
+      }
     });
   }, []);
 
   useEffect(() => {
     window.electron.onTournament((e, { startggTournament: newTournament }) => {
-      setStartggTournament(newTournament);
+      if (adminedTournaments != undefined) {
+        setStartggTournament(newTournament);
+      }
     });
   }, []);
 
@@ -163,8 +188,6 @@ function IndexPage() {
           : participant.displayName;
       })
       .join(',');
-
-    console.log(startggTournament);
 
     window.electron.copyToClipboard(clipboardValue);
     showErrorDialog(['Copied value!\n' + clipboardValue]);

@@ -7,26 +7,17 @@ import {
   RegistrationOption,
 } from '../common/types';
 
-let lastAuthenticatedRequestSucceeded: boolean = false;
 let currentTournament: Tournament | undefined;
 let venueFeeOption: Id | undefined;
-export function getLastAuthenticatedRequestSucceeded() {
-  return lastAuthenticatedRequestSucceeded;
-}
 
 export function getCurrentTournament() {
   return currentTournament;
-}
-
-async function setCurrentTournament(tournament: Tournament | undefined) {
-  currentTournament = tournament;
 }
 
 async function wrappedFetch(
   input: URL | RequestInfo,
   init?: RequestInit | undefined,
 ): Promise<Response> {
-  //TODO: figure out what happens when cookies are out of date!!
   let response: Response | undefined;
   try {
     response = await fetch(input, init);
@@ -67,26 +58,18 @@ async function wrappedFetch(
   return response;
 }
 
-export async function getTournament(cookies: Cookie[], slugOrShort: string) {
-  const response = await wrappedFetch(
-    `https://api.start.gg/tournament/${slugOrShort}?expand[]=event`,
-  );
-  const json = await response.json();
-  const { name, locationDisplayName: location } = json.entities.tournament;
-  const slug = json.entities.tournament.slug.slice(11);
+export async function getTournament(cookies: Cookie[], slug: string) {
+  return getRegistration(cookies, slug).then((registration) => {
+    if (registration == undefined) {
+      return undefined;
+    }
 
-  return getRegistration(cookies, slugOrShort).then((registration) => {
     const tournament = {
-      name,
-      slug,
-      participants: registration.participants,
-      registrationOptions: registration.registrationOptions,
-      participantPaidStatuses: registration.participantPaidStatuses,
-      participantRegisteredStatuses: registration.participantRegisteredStatuses,
+      ...registration,
       updatingCheckboxes: [],
     };
 
-    setCurrentTournament(tournament);
+    currentTournament = tournament;
     return tournament;
   });
 }
@@ -96,6 +79,11 @@ async function fetchUnofficialGql(
   query: string,
   variables: any,
 ) {
+  //note that this method expects every query to include
+  //   currentUser {
+  //      id
+  //   }
+  // to confirm that it's been authenticated
   const response = await wrappedFetch('https://www.start.gg/api/-/gql', {
     method: 'POST',
     headers: {
@@ -115,6 +103,10 @@ async function fetchUnofficialGql(
     throw new Error(`${message}${retryMsg}`);
   }
 
+  if (json.data.currentUser?.id == undefined) {
+    return undefined;
+  }
+
   return json.data;
 }
 
@@ -125,6 +117,13 @@ query TournamentEvents(
   $perPage: Int = 100
   $sortBy: String = "id DESC"
 ) {
+  currentUser {
+    id
+  }
+  tournament(slug: $tournamentSlug) {
+    name
+    slug
+  }
   tournamentRegistrationInfo: tournament(slug: $tournamentSlug) {
     events {
       id
@@ -152,6 +151,9 @@ query TournamentParticipants(
   $perPage: Int = 100
   $sortBy: String = "id DESC"
 ) {
+  currentUser {
+    id
+  }
   tournamentRegistrationInfo: tournament(slug: $tournamentSlug) {
     participants(
       query: { page: $page, perPage: $perPage, sortBy: $sortBy }
@@ -265,6 +267,11 @@ export async function getRegistration(cookies: Cookie[], slugOrShort: string) {
   let eventsQuery = await fetchUnofficialGql(cookies, GQL_GET_EVENTS, {
     tournamentSlug: slugOrShort,
   });
+  if (eventsQuery == undefined) {
+    return undefined;
+  }
+  const name = eventsQuery['tournament']['name'];
+  const slug = eventsQuery['tournament']['slug'];
   ingestEvents(eventsQuery, registrationOptions);
 
   let participantsQuery = await fetchUnofficialGql(
@@ -274,6 +281,9 @@ export async function getRegistration(cookies: Cookie[], slugOrShort: string) {
       tournamentSlug: slugOrShort,
     },
   );
+  if (participantsQuery == undefined) {
+    return undefined;
+  }
   ingestParticipants(
     participantsQuery,
     participants,
@@ -299,6 +309,9 @@ export async function getRegistration(cookies: Cookie[], slugOrShort: string) {
           ]['page'] + 1,
       },
     );
+    if (participantsQuery == undefined) {
+      return undefined;
+    }
     ingestParticipants(
       participantsQuery,
       participants,
@@ -308,6 +321,8 @@ export async function getRegistration(cookies: Cookie[], slugOrShort: string) {
   }
 
   return {
+    name: name,
+    slug: slug,
     participants: participants,
     registrationOptions: registrationOptions,
     participantPaidStatuses: participantPaidStatuses,
@@ -323,6 +338,9 @@ mutation UpdateParticipantRegistration(
   $eventIds: [ID!],
   $paidEventIds: [ID!]
 ) {
+  currentUser {
+    id
+  }
   updateParticipantRegistration(
     participantId: $participantId
     entrantData: {
@@ -382,8 +400,6 @@ export async function updateParticipantRegistration(
     if (currentTournament == undefined) {
       return;
     }
-
-    lastAuthenticatedRequestSucceeded = true;
 
     currentTournament.participantPaidStatuses[attendee] = {};
     currentTournament.participantRegisteredStatuses[attendee] = {};
@@ -459,6 +475,7 @@ export async function toggleParticipantAdded(attendee: Id, option: any) {
 const GET_TOURNAMENTS_QUERY = `
   query TournamentsQuery {
     currentUser {
+      id
       tournaments(query: {perPage: 50, filter: {tournamentView: "admin"}}) {
         nodes {
           hasOfflineEvents
@@ -471,10 +488,13 @@ const GET_TOURNAMENTS_QUERY = `
 `;
 export async function getAdminedTournaments(
   cookies: Cookie[],
-): Promise<AdminedTournament[]> {
+): Promise<AdminedTournament[] | undefined> {
   return fetchUnofficialGql(cookies, GET_TOURNAMENTS_QUERY, {})
     .then(async (data) => {
-      lastAuthenticatedRequestSucceeded = true;
+      if (data == undefined) {
+        return undefined;
+      }
+
       return data.currentUser.tournaments.nodes
         .filter((tournament: any) => tournament.hasOfflineEvents)
         .map((tournament: any) => ({
@@ -483,7 +503,6 @@ export async function getAdminedTournaments(
         }));
     })
     .catch(async (e) => {
-      lastAuthenticatedRequestSucceeded = true;
       throw e;
     });
 }

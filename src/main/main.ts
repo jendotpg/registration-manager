@@ -136,8 +136,6 @@ const createWindow = async () => {
     icon: getAssetPath('icon.png'),
     autoHideMenuBar: true,
     webPreferences: {
-      devTools: false,
-
       preload: app.isPackaged
         ? path.join(__dirname, 'preload.js')
         : path.join(__dirname, '../../.erb/dll/preload.js'),
@@ -160,11 +158,6 @@ const createWindow = async () => {
 
   mainWindow.on('closed', () => {
     mainWindow = null;
-    // Respect the OSX convention of having the application in memory even
-    // after all windows have been closed
-    if (process.platform !== 'darwin') {
-      app.quit();
-    }
   });
 
   const menuBuilder = new MenuBuilder(mainWindow);
@@ -210,6 +203,14 @@ app
       // On macOS it's common to re-create a window in the app when the
       // dock icon is clicked and there are no other windows open.
       if (mainWindow === null) createWindow();
+    });
+
+    app.on('window-all-closed', () => {
+      // Respect the OSX convention of having the application in memory even
+      // after all windows have been closed
+      if (process.platform !== 'darwin') {
+        app.quit();
+      }
     });
   })
   .catch(console.log);
