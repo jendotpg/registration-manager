@@ -14,7 +14,10 @@ import {
   ContentCopy,
 } from '@mui/icons-material';
 import {
+  cloneElement,
   Dispatch,
+  MouseEvent,
+  ReactElement,
   SetStateAction,
   useLayoutEffect,
   useRef,
@@ -22,6 +25,7 @@ import {
 } from 'react';
 import {
   Participant,
+  RegistrationOption,
   Tournament,
   Id,
   FilterState,
@@ -29,20 +33,81 @@ import {
 } from '../common/types';
 import { PaidMenu, AddedMenu } from './FilterMenus';
 
-const EVENT_COL_MIN_PX = 64;
+const COLUMN_GAP_PX = 8; // between option columns, and name column <-> options
+const ROW_PADDING_X_PX = 24;
+const CONTROL_GAP_PX = 4; // between the two controls inside an event column
+const SMALL_CONTROL_PX = 38; // small Checkbox natural size == forced IconButton size
+const EVENT_COL_MIN_PX = SMALL_CONTROL_PX * 2 + CONTROL_GAP_PX;
+const TOOLTIP_ENTER_DELAY_MS = 350;
 const LABEL_WIDTH_PAD_PX = 8;
 const NAME_COL_MAX_PX = 500;
 const NAME_COL_MIN_PX = 290;
 const VENUE_COL_MAX_PX = 200;
+const VENUE_COL_MIN_PX = 120;
 const NAME_COL_WIDTH = `max(${NAME_COL_MIN_PX}px, min(${NAME_COL_MAX_PX}px, 25%))`;
-const VENUE_COL_WIDTH = `min(${VENUE_COL_MAX_PX}px, 20%)`;
+const COLUMN_GAP = `${COLUMN_GAP_PX}px`;
+const CONTROL_GAP = `${CONTROL_GAP_PX}px`;
+
+const EVENT_STARTED_REASON = 'EVENT STARTED — cannot add';
+const FREE_REASON = 'FREE — no payment required';
 
 const ACTIVE_ICON_BUTTON_SX = { backgroundColor: 'action.selected' } as const;
 const SMALL_ICON_BUTTON_SX = {
-  width: '38px',
-  height: '38px',
-  marginRight: '-12px',
+  width: `${SMALL_CONTROL_PX}px`,
+  height: `${SMALL_CONTROL_PX}px`,
 } as const;
+
+function disabledReason(
+  startggTournament: Tournament,
+  tournamentParticipant: Participant,
+  registrationOption: RegistrationOption,
+  kind: 'paid' | 'added',
+) {
+  if (
+    startggTournament.updatingCheckboxes.includes(
+      `${tournamentParticipant.id};${registrationOption.id}`,
+    )
+  ) {
+    return 'Updating…';
+  }
+  if (kind == 'added') {
+    return registrationOption.started ? EVENT_STARTED_REASON : '';
+  }
+  if (registrationOption.free) {
+    return FREE_REASON;
+  }
+  if (
+    registrationOption.type == 'event' &&
+    registrationOption.started &&
+    !tournamentParticipant.registeredStatuses[registrationOption.id]
+  ) {
+    return EVENT_STARTED_REASON;
+  }
+  return '';
+}
+
+function EllipsisTooltip({
+  title,
+  children,
+}: {
+  title: string;
+  children: ReactElement;
+}) {
+  const [overflowed, setOverflowed] = useState(false);
+  return (
+    <Tooltip
+      enterDelay={TOOLTIP_ENTER_DELAY_MS}
+      title={overflowed ? title : ''}
+    >
+      {cloneElement(children, {
+        onMouseEnter: (event: MouseEvent<HTMLElement>) => {
+          const el = event.currentTarget;
+          setOverflowed(el.scrollWidth > el.clientWidth);
+        },
+      })}
+    </Tooltip>
+  );
+}
 
 function FilterIconButton({
   small,
@@ -57,10 +122,9 @@ function FilterIconButton({
 }) {
   return (
     <span>
-      <Tooltip arrow title="Apply Filter">
+      <Tooltip arrow enterDelay={TOOLTIP_ENTER_DELAY_MS} title="Apply Filter">
         <IconButton
           size={small ? 'small' : 'medium'}
-          edge="end"
           sx={[small && SMALL_ICON_BUTTON_SX, active && ACTIVE_ICON_BUTTON_SX]}
           ref={buttonRef}
           onClick={onClick}
@@ -110,8 +174,7 @@ export default function StartggCheckin({
   const [measuredLabelWidths, setMeasuredLabelWidths] = useState<
     Record<Id, number>
   >({});
-  const eventRegistrationOptionsKey = startggTournament.registrationOptions
-    .filter((registrationOption) => registrationOption.type == 'event')
+  const registrationOptionsKey = startggTournament.registrationOptions
     .map((registrationOption) => registrationOption.id)
     .join(',');
   useLayoutEffect(() => {
@@ -122,12 +185,15 @@ export default function StartggCheckin({
       }
     });
     setMeasuredLabelWidths(next);
-  }, [eventRegistrationOptionsKey]);
-  const eventColumnWidthPx = (id: Id) =>
-    Math.max(
-      EVENT_COL_MIN_PX,
-      Math.ceil(measuredLabelWidths[id] ?? 0) + LABEL_WIDTH_PAD_PX,
-    );
+  }, [registrationOptionsKey]);
+  const columnWidthPx = (registrationOption: RegistrationOption) => {
+    const labelWidth =
+      Math.ceil(measuredLabelWidths[registrationOption.id] ?? 0) +
+      LABEL_WIDTH_PAD_PX;
+    return registrationOption.type == 'event'
+      ? Math.max(EVENT_COL_MIN_PX, labelWidth)
+      : Math.min(VENUE_COL_MAX_PX, Math.max(VENUE_COL_MIN_PX, labelWidth));
+  };
 
   const filterFor = (id: Id) => filterState[id] ?? DEFAULT_FILTER_STATE;
 
@@ -147,23 +213,22 @@ export default function StartggCheckin({
     setRegisteredMenuOpen((prev) => ({ ...prev, [id]: true }));
   const closeRegisteredMenu = (id: Id) =>
     setRegisteredMenuOpen((prev) => ({ ...prev, [id]: false }));
-  const tournamentOptionCount = startggTournament.registrationOptions.filter(
-    (registrationOption) => registrationOption.type == 'tournament',
-  ).length;
-  const eventColumnWidthTotalPx = startggTournament.registrationOptions
-    .filter((registrationOption) => registrationOption.type == 'event')
-    .reduce(
-      (total, registrationOption) =>
-        total + eventColumnWidthPx(registrationOption.id),
-      0,
-    );
-  const columnGaps = (startggTournament.registrationOptions.length + 1) * 32;
-  const tableMinWidth = `${
-    NAME_COL_MAX_PX +
-    tournamentOptionCount * VENUE_COL_MAX_PX +
-    eventColumnWidthTotalPx +
-    columnGaps
-  }px`;
+
+  const optionCount = startggTournament.registrationOptions.length;
+  const columnWidthTotalPx = startggTournament.registrationOptions.reduce(
+    (total, registrationOption) => total + columnWidthPx(registrationOption),
+    0,
+  );
+  const restPx =
+    ROW_PADDING_X_PX * 2 +
+    COLUMN_GAP_PX +
+    columnWidthTotalPx +
+    COLUMN_GAP_PX * Math.max(0, optionCount - 1);
+  const nameColPx = Math.min(
+    NAME_COL_MAX_PX,
+    Math.max(NAME_COL_MIN_PX, restPx / 3),
+  );
+  const tableMinWidth = `${Math.ceil(restPx + nameColPx)}px`;
 
   return startggTournament.slug == '' ? (
     <Stack
@@ -177,8 +242,8 @@ export default function StartggCheckin({
     </Stack>
   ) : (
     <>
-      {/* Invisible copies of each event label, used only to measure their
-          natural width for eventColumnWidthPx above - never shown */}
+      {/* Invisible copies of each option label, used only to measure their
+          natural width for columnWidthPx above - never shown */}
       <div
         style={{
           position: 'absolute',
@@ -189,20 +254,18 @@ export default function StartggCheckin({
           left: -9999,
         }}
       >
-        {startggTournament.registrationOptions
-          .filter((registrationOption) => registrationOption.type == 'event')
-          .map((registrationOption) => (
-            <Typography
-              key={registrationOption.id}
-              component="span"
-              sx={{ fontWeight: 'bold' }}
-              ref={(el: HTMLSpanElement | null) => {
-                labelMeasureRefs.current[registrationOption.id] = el;
-              }}
-            >
-              {registrationOption.name}
-            </Typography>
-          ))}
+        {startggTournament.registrationOptions.map((registrationOption) => (
+          <Typography
+            key={registrationOption.id}
+            component="span"
+            sx={{ fontWeight: 'bold' }}
+            ref={(el: HTMLSpanElement | null) => {
+              labelMeasureRefs.current[registrationOption.id] = el;
+            }}
+          >
+            {registrationOption.name}
+          </Typography>
+        ))}
       </div>
       <Stack
         sx={{
@@ -214,9 +277,9 @@ export default function StartggCheckin({
           <Stack
             direction="row"
             alignItems="center"
-            spacing="8px"
+            spacing={COLUMN_GAP}
             useFlexGap
-            padding="0 24px"
+            padding={`0 ${ROW_PADDING_X_PX}px`}
             sx={{
               position: 'sticky',
               top: 0,
@@ -238,15 +301,13 @@ export default function StartggCheckin({
                 left: 0,
                 zIndex: 4,
                 width: NAME_COL_WIDTH,
-                'min-width': NAME_COL_WIDTH,
+                minWidth: NAME_COL_WIDTH,
                 backgroundColor: 'background.paper',
                 alignSelf: 'stretch',
                 marginTop: '-8px',
                 marginBottom: '-8px',
                 boxSizing: 'border-box',
                 padding: '8px 12px',
-                borderBottom: '1px solid',
-                borderColor: 'divider',
               }}
             >
               <TextField
@@ -272,12 +333,20 @@ export default function StartggCheckin({
                   flexShrink: 0,
                 }}
               >
-                <Tooltip arrow title="Copy Listed Participants">
+                <Tooltip
+                  arrow
+                  enterDelay={TOOLTIP_ENTER_DELAY_MS}
+                  title="Copy Listed Participants"
+                >
                   <IconButton onClick={copyFilteredParticipants}>
                     <ContentCopy />
                   </IconButton>
                 </Tooltip>
-                <Tooltip arrow title="Refresh">
+                <Tooltip
+                  arrow
+                  enterDelay={TOOLTIP_ENTER_DELAY_MS}
+                  title="Refresh"
+                >
                   <IconButton
                     onClick={async () => {
                       try {
@@ -294,7 +363,11 @@ export default function StartggCheckin({
                     <Refresh />
                   </IconButton>
                 </Tooltip>
-                <Tooltip arrow title="Clear all filters">
+                <Tooltip
+                  arrow
+                  enterDelay={TOOLTIP_ENTER_DELAY_MS}
+                  title="Clear all filters"
+                >
                   <IconButton onClick={resetFilters}>
                     <FilterListOff />
                   </IconButton>
@@ -305,7 +378,7 @@ export default function StartggCheckin({
             <Stack
               direction="row"
               alignItems="center"
-              spacing="8px"
+              spacing={COLUMN_GAP}
               sx={{
                 flex: 1,
                 justifyContent: 'space-between',
@@ -320,14 +393,12 @@ export default function StartggCheckin({
                     <Stack
                       key={id}
                       sx={{
-                        width: isEvent
-                          ? `${eventColumnWidthPx(id)}px`
-                          : VENUE_COL_WIDTH,
+                        width: `${columnWidthPx(registrationOption)}px`,
                         zIndex: 3,
                         flexShrink: 0,
                       }}
                     >
-                      <Tooltip title={registrationOption.name}>
+                      <EllipsisTooltip title={registrationOption.name}>
                         <Typography
                           key={`${id}-name`}
                           noWrap
@@ -336,20 +407,19 @@ export default function StartggCheckin({
                             fontWeight: 'bold',
                             overflow: 'hidden',
                             textOverflow: 'ellipsis',
-                            transform: 'translateX(6px)',
                           }}
                         >
                           {registrationOption.name}
                         </Typography>
-                      </Tooltip>
+                      </EllipsisTooltip>
 
                       <Stack
                         direction="row"
                         justifyContent="center"
-                        spacing="4px"
+                        spacing={CONTROL_GAP}
                         sx={{
                           width: '100%',
-                          'min-width': '100%',
+                          minWidth: '100%',
                         }}
                       >
                         <FilterIconButton
@@ -414,229 +484,192 @@ export default function StartggCheckin({
                 .filter(
                   (tournamentParticipant) => !tournamentParticipant.filtered,
                 )
-                .map((tournamentParticipant: Participant) => (
-                  <Stack
-                    key={tournamentParticipant.id}
-                    direction="row"
-                    alignItems="center"
-                    spacing="8px"
-                    useFlexGap
-                    padding="4px 24px"
-                  >
+                .map((tournamentParticipant: Participant) => {
+                  const participantName =
+                    (tournamentParticipant.prefix
+                      ? `${tournamentParticipant.prefix} | `
+                      : '') + tournamentParticipant.displayName;
+                  return (
                     <Stack
+                      key={tournamentParticipant.id}
                       direction="row"
                       alignItems="center"
-                      sx={{
-                        width: NAME_COL_WIDTH,
-                        flexShrink: 0,
-                        position: 'sticky',
-                        left: 0,
-                        zIndex: 1,
-                        backgroundColor: 'background.paper',
-                        borderRight: '1px solid',
-                        borderColor: 'divider',
-                        alignSelf: 'stretch',
-                        marginTop: '-4px',
-                        marginBottom: '-4px',
-                      }}
+                      spacing={COLUMN_GAP}
+                      useFlexGap
+                      padding={`4px ${ROW_PADDING_X_PX}px`}
                     >
-                      <Tooltip
-                        title={`${
-                          (tournamentParticipant.prefix
-                            ? `${tournamentParticipant.prefix} | `
-                            : '') + tournamentParticipant.displayName
-                        } (${tournamentParticipant.id})`}
+                      <Stack
+                        direction="row"
+                        alignItems="center"
+                        sx={{
+                          width: NAME_COL_WIDTH,
+                          flexShrink: 0,
+                          position: 'sticky',
+                          left: 0,
+                          zIndex: 1,
+                          backgroundColor: 'background.paper',
+                          boxSizing: 'border-box',
+                          borderRight: '1px solid',
+                          borderColor: 'divider',
+                          alignSelf: 'stretch',
+                          marginTop: '-4px',
+                          marginBottom: '-4px',
+                        }}
                       >
-                        <Typography
-                          noWrap
-                          sx={{
-                            flex: 1,
-                            minWidth: 0,
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis',
-                          }}
-                        >
-                          {(tournamentParticipant.prefix
-                            ? `${tournamentParticipant.prefix} | `
-                            : '') + tournamentParticipant.displayName}
-                        </Typography>
-                      </Tooltip>
-                    </Stack>
-                    <Stack
-                      direction="row"
-                      alignItems="center"
-                      spacing="8px"
-                      sx={{
-                        flex: 1,
-                        justifyContent: 'space-between',
-                      }}
-                    >
-                      {startggTournament.registrationOptions.map(
-                        (registrationOption) =>
-                          registrationOption.type == 'tournament' ? (
-                            <Stack
-                              key={`${registrationOption.id}-checkboxes`}
-                              alignItems="center"
-                              sx={{
-                                width: VENUE_COL_WIDTH,
-                                flexShrink: 0,
-                              }}
-                            >
-                              <Tooltip
-                                title={`${
-                                  (tournamentParticipant.prefix
-                                    ? `${tournamentParticipant.prefix} | `
-                                    : '') + tournamentParticipant.displayName
-                                } — ${registrationOption.name}${
-                                  registrationOption.free
-                                    ? ' — FREE'
-                                    : ' — Paid'
-                                }`}
+                        <EllipsisTooltip title={participantName}>
+                          <Typography
+                            noWrap
+                            sx={{
+                              flex: 1,
+                              minWidth: 0,
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                            }}
+                          >
+                            {participantName}
+                          </Typography>
+                        </EllipsisTooltip>
+                      </Stack>
+                      <Stack
+                        direction="row"
+                        alignItems="center"
+                        spacing={COLUMN_GAP}
+                        sx={{
+                          flex: 1,
+                          justifyContent: 'space-between',
+                        }}
+                      >
+                        {startggTournament.registrationOptions.map(
+                          (registrationOption) => {
+                            const paidReason = disabledReason(
+                              startggTournament,
+                              tournamentParticipant,
+                              registrationOption,
+                              'paid',
+                            );
+                            const addedReason = disabledReason(
+                              startggTournament,
+                              tournamentParticipant,
+                              registrationOption,
+                              'added',
+                            );
+                            return registrationOption.type == 'tournament' ? (
+                              <Stack
+                                key={`${registrationOption.id}-checkboxes`}
+                                alignItems="center"
+                                sx={{
+                                  width: `${columnWidthPx(
+                                    registrationOption,
+                                  )}px`,
+                                  flexShrink: 0,
+                                }}
                               >
-                                <span>
-                                  <Checkbox
-                                    disabled={
-                                      startggTournament.updatingCheckboxes.includes(
-                                        `${tournamentParticipant.id};${registrationOption.id}`,
-                                      ) || registrationOption.free
-                                    }
-                                    edge="end"
-                                    checked={
-                                      !!tournamentParticipant.paidStatuses[
-                                        registrationOption.id
-                                      ]
-                                    }
-                                    onClick={async () => {
-                                      try {
-                                        await window.electron.toggleParticipantPaid(
-                                          tournamentParticipant.id,
-                                          registrationOption.id,
-                                        );
-                                      } catch (e: any) {
-                                        showErrorDialog([
-                                          e instanceof Error ? e.message : e,
-                                        ]);
+                                <Tooltip
+                                  enterDelay={TOOLTIP_ENTER_DELAY_MS}
+                                  title={paidReason}
+                                >
+                                  <span>
+                                    <Checkbox
+                                      disabled={paidReason != ''}
+                                      checked={
+                                        !!tournamentParticipant.paidStatuses[
+                                          registrationOption.id
+                                        ]
                                       }
-                                    }}
-                                  />
-                                </span>
-                              </Tooltip>
-                            </Stack>
-                          ) : (
-                            <Stack
-                              key={`${registrationOption.id}-checkboxes`}
-                              direction="row"
-                              spacing="4px"
-                              justifyContent="center"
-                              sx={{
-                                width: `${eventColumnWidthPx(
-                                  registrationOption.id,
-                                )}px`,
-                                flexShrink: 0,
-                              }}
-                            >
-                              <Tooltip
-                                title={
-                                  registrationOption.started &&
-                                  !tournamentParticipant.registeredStatuses[
-                                    registrationOption.id
-                                  ]
-                                    ? 'EVENT STARTED — CANNOT ADD'
-                                    : `${
-                                        (tournamentParticipant.prefix
-                                          ? `${tournamentParticipant.prefix} | `
-                                          : '') +
-                                        tournamentParticipant.displayName
-                                      } — ${registrationOption.name}${
-                                        registrationOption.free
-                                          ? ' — FREE'
-                                          : ' — Paid'
-                                      }`
-                                }
+                                      onClick={async () => {
+                                        try {
+                                          await window.electron.toggleParticipantPaid(
+                                            tournamentParticipant.id,
+                                            registrationOption.id,
+                                          );
+                                        } catch (e: any) {
+                                          showErrorDialog([
+                                            e instanceof Error ? e.message : e,
+                                          ]);
+                                        }
+                                      }}
+                                    />
+                                  </span>
+                                </Tooltip>
+                              </Stack>
+                            ) : (
+                              <Stack
+                                key={`${registrationOption.id}-checkboxes`}
+                                direction="row"
+                                spacing={CONTROL_GAP}
+                                justifyContent="center"
+                                sx={{
+                                  width: `${columnWidthPx(
+                                    registrationOption,
+                                  )}px`,
+                                  flexShrink: 0,
+                                }}
                               >
-                                <span>
-                                  <Checkbox
-                                    disabled={
-                                      startggTournament.updatingCheckboxes.includes(
-                                        `${tournamentParticipant.id};${registrationOption.id}`,
-                                      ) ||
-                                      registrationOption.free ||
-                                      (registrationOption.started &&
-                                        !tournamentParticipant
+                                <Tooltip
+                                  enterDelay={TOOLTIP_ENTER_DELAY_MS}
+                                  title={paidReason}
+                                >
+                                  <span>
+                                    <Checkbox
+                                      disabled={paidReason != ''}
+                                      size="small"
+                                      checked={
+                                        !!tournamentParticipant.paidStatuses[
+                                          registrationOption.id
+                                        ]
+                                      }
+                                      onClick={async () => {
+                                        try {
+                                          await window.electron.toggleParticipantPaid(
+                                            tournamentParticipant.id,
+                                            registrationOption.id,
+                                          );
+                                        } catch (e: any) {
+                                          showErrorDialog([
+                                            e instanceof Error ? e.message : e,
+                                          ]);
+                                        }
+                                      }}
+                                    />
+                                  </span>
+                                </Tooltip>
+                                <Tooltip
+                                  enterDelay={TOOLTIP_ENTER_DELAY_MS}
+                                  title={addedReason}
+                                >
+                                  <span>
+                                    <Checkbox
+                                      disabled={addedReason != ''}
+                                      size="small"
+                                      checked={
+                                        !!tournamentParticipant
                                           .registeredStatuses[
                                           registrationOption.id
-                                        ])
-                                    }
-                                    size="small"
-                                    edge="end"
-                                    checked={
-                                      !!tournamentParticipant.paidStatuses[
-                                        registrationOption.id
-                                      ]
-                                    }
-                                    onClick={async () => {
-                                      try {
-                                        await window.electron.toggleParticipantPaid(
-                                          tournamentParticipant.id,
-                                          registrationOption.id,
-                                        );
-                                      } catch (e: any) {
-                                        showErrorDialog([
-                                          e instanceof Error ? e.message : e,
-                                        ]);
+                                        ]
                                       }
-                                    }}
-                                  />
-                                </span>
-                              </Tooltip>
-                              <Tooltip
-                                title={
-                                  registrationOption.started
-                                    ? 'EVENT STARTED — CANNOT ADD'
-                                    : `${
-                                        (tournamentParticipant.prefix
-                                          ? `${tournamentParticipant.prefix} | `
-                                          : '') +
-                                        tournamentParticipant.displayName
-                                      } — ${registrationOption.name} — Added`
-                                }
-                              >
-                                <span>
-                                  <Checkbox
-                                    disabled={
-                                      startggTournament.updatingCheckboxes.includes(
-                                        `${tournamentParticipant.id};${registrationOption.id}`,
-                                      ) || registrationOption.started
-                                    }
-                                    size="small"
-                                    edge="end"
-                                    checked={
-                                      !!tournamentParticipant
-                                        .registeredStatuses[
-                                        registrationOption.id
-                                      ]
-                                    }
-                                    onClick={async () => {
-                                      try {
-                                        await window.electron.toggleParticipantAdded(
-                                          tournamentParticipant.id,
-                                          registrationOption.id,
-                                        );
-                                      } catch (e: any) {
-                                        showErrorDialog([
-                                          e instanceof Error ? e.message : e,
-                                        ]);
-                                      }
-                                    }}
-                                  />
-                                </span>
-                              </Tooltip>
-                            </Stack>
-                          ),
-                      )}
+                                      onClick={async () => {
+                                        try {
+                                          await window.electron.toggleParticipantAdded(
+                                            tournamentParticipant.id,
+                                            registrationOption.id,
+                                          );
+                                        } catch (e: any) {
+                                          showErrorDialog([
+                                            e instanceof Error ? e.message : e,
+                                          ]);
+                                        }
+                                      }}
+                                    />
+                                  </span>
+                                </Tooltip>
+                              </Stack>
+                            );
+                          },
+                        )}
+                      </Stack>
                     </Stack>
-                  </Stack>
-                ))
+                  );
+                })
             )}
           </Stack>
         </Stack>

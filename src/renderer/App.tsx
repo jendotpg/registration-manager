@@ -13,10 +13,10 @@ import StartggCheckin from './StartggCheckin';
 import { WindowEvent } from './setWindowEventListener';
 import ErrorDialog from './ErrorDialog';
 
-// TODO: visual fixes: remove double border, lower padding
 // TODO: set window title after pulling tournament
 // TODO: pull pools from startgg!
 // TODO: pull DQ status from startgg!
+// TODO: pull user discriminators from startgg ?
 // TODO: improve copy dialog...
 // TODO: set up testing
 // TODO: performance fix for filtering - it slows down a LOT with big events...
@@ -24,6 +24,7 @@ import ErrorDialog from './ErrorDialog';
 // TODO: main/startgg.ts and main/ipc.ts are coupled weirdly i think - look into this further... (the smell for me is copy text being generated in startgg - feels like the wrong place)
 // TODO: implement undo / redo tree?
 // TODO: improve teams handling?
+// TODO: support for add participant?
 // TODO: reconsider login flow?
 
 function IndexPage() {
