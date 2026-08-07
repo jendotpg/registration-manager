@@ -536,22 +536,36 @@ export default function StartggCheckin({
                               }}
                             >
                               <Tooltip
-                                title={`${
-                                  (tournamentParticipant.prefix
-                                    ? `${tournamentParticipant.prefix} | `
-                                    : '') + tournamentParticipant.displayName
-                                } — ${registrationOption.name}${
-                                  registrationOption.free
-                                    ? ' — FREE'
-                                    : ' — Paid'
-                                }`}
+                                title={
+                                  registrationOption.started &&
+                                  !tournamentParticipant.registeredStatuses[
+                                    registrationOption.id
+                                  ]
+                                    ? 'EVENT STARTED — CANNOT ADD'
+                                    : `${
+                                        (tournamentParticipant.prefix
+                                          ? `${tournamentParticipant.prefix} | `
+                                          : '') +
+                                        tournamentParticipant.displayName
+                                      } — ${registrationOption.name}${
+                                        registrationOption.free
+                                          ? ' — FREE'
+                                          : ' — Paid'
+                                      }`
+                                }
                               >
                                 <span>
                                   <Checkbox
                                     disabled={
                                       startggTournament.updatingCheckboxes.includes(
                                         `${tournamentParticipant.id};${registrationOption.id}`,
-                                      ) || registrationOption.free
+                                      ) ||
+                                      registrationOption.free ||
+                                      (registrationOption.started &&
+                                        !tournamentParticipant
+                                          .registeredStatuses[
+                                          registrationOption.id
+                                        ])
                                     }
                                     size="small"
                                     edge="end"
@@ -578,7 +592,7 @@ export default function StartggCheckin({
                               <Tooltip
                                 title={
                                   registrationOption.started
-                                    ? 'EVENT STARTED'
+                                    ? 'EVENT STARTED — CANNOT ADD'
                                     : `${
                                         (tournamentParticipant.prefix
                                           ? `${tournamentParticipant.prefix} | `

@@ -13,16 +13,16 @@ import StartggCheckin from './StartggCheckin';
 import { WindowEvent } from './setWindowEventListener';
 import ErrorDialog from './ErrorDialog';
 
-// TODO: grey out "paid" checkbox if user hasnt been added to event
+// TODO: visual fixes: remove double border, lower padding
 // TODO: set window title after pulling tournament
 // TODO: pull pools from startgg!
 // TODO: pull DQ status from startgg!
+// TODO: improve copy dialog...
 // TODO: set up testing
 // TODO: performance fix for filtering - it slows down a LOT with big events...
 // TODO: fix building!! we're hardcoding the fucking python path LMFAOOO. i also cant build x86 windows binaries. use github actions?
-// TODO: main/startgg.ts and main/ipc.ts are coupled weirdly i think - look into this further...
-// TODO: improve copy dialog...
-// TODO: implement undo / redo tree
+// TODO: main/startgg.ts and main/ipc.ts are coupled weirdly i think - look into this further... (the smell for me is copy text being generated in startgg - feels like the wrong place)
+// TODO: implement undo / redo tree?
 // TODO: improve teams handling?
 // TODO: reconsider login flow?
 

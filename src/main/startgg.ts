@@ -520,7 +520,16 @@ export async function toggleParticipantPaid(attendee: Id, option: Id) {
     return;
   }
 
-  participant.paidStatuses[option] = !participant.paidStatuses[option];
+  const justPaid = !participant.paidStatuses[option];
+  participant.paidStatuses[option] = justPaid;
+
+  const registrationOption = currentTournament.registrationOptions.find(
+    (regOption) => regOption.id == option,
+  );
+  if (justPaid && registrationOption?.type == 'event') {
+    participant.registeredStatuses[option] = true;
+  }
+
   currentTournament.updatingCheckboxes.push(`${attendee};${option}`);
 }
 
