@@ -128,8 +128,9 @@ const createWindow = async () => {
   }
 
   mainWindow = new BrowserWindow({
-    minWidth: 933,
-    minHeight: 720,
+    useContentSize: true,
+    minWidth: 600,
+    minHeight: 400,
     show: false,
     width: 1024,
     height: 896,

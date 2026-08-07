@@ -1,8 +1,8 @@
 import { IpcRendererEvent, contextBridge, ipcRenderer } from 'electron';
 import {
   AdminedTournament,
+  FilterState,
   Id,
-  Participant,
   Tournament,
 } from '../common/types';
 
@@ -22,8 +22,11 @@ const electronHandler = {
     ipcRenderer.invoke('toggleParticipantPaid', attendee, option),
   toggleParticipantAdded: (attendee: Id, option: Id) =>
     ipcRenderer.invoke('toggleParticipantAdded', attendee, option),
-  copyToClipboard: (clipboardValue: string): Promise<void> =>
-    ipcRenderer.invoke('copyToClipboard', clipboardValue),
+  updateParticipantsFiltered: (
+    searchText: string,
+    filters: Record<Id, FilterState>,
+  ) => ipcRenderer.invoke('updateParticipantsFiltered', searchText, filters),
+  copyToClipboard: (): Promise<string> => ipcRenderer.invoke('copyToClipboard'),
 
   onLoggedInStatus: (
     callback: (

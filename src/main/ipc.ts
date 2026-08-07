@@ -7,9 +7,11 @@ import {
   toggleParticipantPaid,
   toggleParticipantAdded,
   updateParticipantRegistration,
+  updateParticipantsFiltered,
+  getVisibleParticipantsText,
 } from './startgg';
 import { openStartggLoginWindow } from './loginwindow';
-import { Id } from '../common/types';
+import { FilterState, Id } from '../common/types';
 
 export default function setupIPCs(mainWindow: BrowserWindow): void {
   const store = new Store<{
@@ -38,8 +40,6 @@ export default function setupIPCs(mainWindow: BrowserWindow): void {
         slug: '',
         name: '',
         registrationOptions: [],
-        participantPaidStatuses: {},
-        participantRegisteredStatuses: {},
         participants: [],
         updatingCheckboxes: [],
       },
@@ -136,8 +136,25 @@ export default function setupIPCs(mainWindow: BrowserWindow): void {
     },
   );
 
+  ipcMain.removeHandler('updateParticipantsFiltered');
+  ipcMain.handle(
+    'updateParticipantsFiltered',
+    async (event, searchText: string, filters: Record<Id, FilterState>) => {
+      updateParticipantsFiltered(searchText, filters);
+
+      const currentTournament = getCurrentTournament();
+      if (currentTournament !== undefined) {
+        mainWindow.webContents.send('tournament', {
+          startggTournament: currentTournament,
+        });
+      }
+    },
+  );
+
   ipcMain.removeHandler('copyToClipboard');
-  ipcMain.handle('copyToClipboard', async (event, clipboardValue: string) => {
+  ipcMain.handle('copyToClipboard', async () => {
+    const clipboardValue = getVisibleParticipantsText();
     clipboard.writeText(clipboardValue);
+    return clipboardValue;
   });
 }

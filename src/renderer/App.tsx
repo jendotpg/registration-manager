@@ -3,8 +3,9 @@ import { useEffect, useRef, useState } from 'react';
 import { GlobalHotKeys } from 'react-hotkeys';
 import {
   AdminedTournament,
+  DEFAULT_FILTER_STATE,
+  FilterState,
   Id,
-  Participant,
   Tournament,
 } from '../common/types';
 import Settings from './Settings';
@@ -12,20 +13,18 @@ import StartggCheckin from './StartggCheckin';
 import { WindowEvent } from './setWindowEventListener';
 import ErrorDialog from './ErrorDialog';
 
-//TODO: update paid / added filters to have dropdowns
-//TODO: fix when you refresh the page the added filter just ... doesnt work? but then if you filter by paid and then unfilter it works?
-//TODO: add filter by pool column (dropdown)
-//TODO: add filter by DQ'd column (dropdown)
-//TODO: grey out "paid" checkbox if user hasnt been added to event
-//TODO: fix building!! we're hardcoding the fucking python path LMFAOOO. i also cant build x86 windows binaries. use github actions?
-//TODO: fix filter spacing ugh
-//TODO: fix key uniqueness issue
-//TODO: implement undo / redo tree
-//TODO: fix settings covering short names
-//TODO: make background of upper sticky work correctly when theres too many events to fit in 100% (use garden brawl as an example)
-//TODO: offload filtering to worker thread (or main thread) - it slows down a LOT with big events...
-//TODO: improve teams handling?
-//TODO: reconsider login flow?
+// TODO: grey out "paid" checkbox if user hasnt been added to event
+// TODO: set window title after pulling tournament
+// TODO: pull pools from startgg!
+// TODO: pull DQ status from startgg!
+// TODO: set up testing
+// TODO: performance fix for filtering - it slows down a LOT with big events...
+// TODO: fix building!! we're hardcoding the fucking python path LMFAOOO. i also cant build x86 windows binaries. use github actions?
+// TODO: main/startgg.ts and main/ipc.ts are coupled weirdly i think - look into this further...
+// TODO: improve copy dialog...
+// TODO: implement undo / redo tree
+// TODO: improve teams handling?
+// TODO: reconsider login flow?
 
 function IndexPage() {
   const [loggedInStatus, setLoggedInStatus] = useState<boolean>(false);
@@ -51,8 +50,6 @@ function IndexPage() {
     slug: '',
     name: '',
     registrationOptions: [],
-    participantPaidStatuses: {},
-    participantRegisteredStatuses: {},
     participants: [],
     updatingCheckboxes: [],
   });
@@ -97,7 +94,7 @@ function IndexPage() {
 
   useEffect(() => {
     window.electron.onTournament((e, { startggTournament: newTournament }) => {
-      if (adminedTournaments != undefined) {
+      if (newTournament != undefined) {
         setStartggTournament(newTournament);
       }
     });
@@ -137,7 +134,7 @@ function IndexPage() {
 
     setGettingTournament(true);
     try {
-      let tournament = await window.electron.getStartggTournament(maybeSlug);
+      const tournament = await window.electron.getStartggTournament(maybeSlug);
       setGettingTournament(false);
       return tournament;
     } catch (e: any) {
@@ -146,68 +143,66 @@ function IndexPage() {
   };
 
   const [searchText, setSearchText] = useState('');
-  const [paidFilters, setPaidFilters] = useState<Record<Id, boolean>>({});
-  const [addedFilters, setAddedFilters] = useState<Record<Id, boolean>>({});
+  const [filterState, setFilterState] = useState<Record<Id, FilterState>>({});
 
-  const applyFilters = (participant: Participant) => {
-    if (
-      !(participant.prefix + '|' + participant.displayName)
-        .toLowerCase()
-        .includes(searchText.toLowerCase())
-    ) {
-      return false;
-    }
-    for (const event in paidFilters) {
-      if (
-        paidFilters[event] &&
-        startggTournament.participantPaidStatuses[participant.id][event] == true
-      ) {
-        return false;
-      }
-      if (
-        addedFilters[event] &&
-        (startggTournament.participantRegisteredStatuses[participant.id][
-          event
-        ] == false ||
-          startggTournament.participantRegisteredStatuses[participant.id][
-            event
-          ] == undefined)
-      ) {
-        return false;
-      }
-    }
-    return true;
+  const [paidMenuOpen, setPaidMenuOpen] = useState<Record<Id, boolean>>({});
+  const [registeredMenuOpen, setRegisteredMenuOpen] = useState<
+    Record<Id, boolean>
+  >({});
+
+  const registrationOptionsKey = startggTournament.registrationOptions
+    .map((registrationOption) => registrationOption.id)
+    .join(',');
+
+  const resetFilters = () => {
+    setFilterState(
+      Object.fromEntries(
+        startggTournament.registrationOptions.map(
+          ({ id, type }): [Id, FilterState] => [
+            id,
+            {
+              ...DEFAULT_FILTER_STATE,
+              // TODO: real pool names once they're pulled from start.gg
+              pools: type == 'event' ? { 'Pool 1': true, 'Pool 2': true } : {},
+            },
+          ],
+        ),
+      ),
+    );
   };
+  useEffect(() => {
+    setPaidMenuOpen({});
+    setRegisteredMenuOpen({});
+    setSearchText('');
+    resetFilters();
+  }, [registrationOptionsKey]);
 
-  const copyFilteredParticipants = () => {
-    const clipboardValue = startggTournament.participants
-      .filter(applyFilters)
-      .map((participant) => {
-        return participant.prefix
-          ? participant.prefix + '|' + participant.displayName
-          : participant.displayName;
-      })
-      .join(',');
+  useEffect(() => {
+    window.electron.updateParticipantsFiltered(searchText, filterState);
+  }, [searchText, filterState]);
 
-    window.electron.copyToClipboard(clipboardValue);
-    showErrorDialog(['Copied value!\n' + clipboardValue]);
+  const copyFilteredParticipants = async () => {
+    const clipboardValue = await window.electron.copyToClipboard();
+    showErrorDialog([`Copied value!\n${clipboardValue}`]);
   };
 
   return (
     <>
       <StartggCheckin
         startggTournament={startggTournament}
-        applyFilters={applyFilters}
         copyFilteredParticipants={copyFilteredParticipants}
         gettingTournament={gettingTournament}
         searchText={searchText}
-        paidFilters={paidFilters}
-        addedFilters={addedFilters}
         setGettingTournament={setGettingTournament}
         setSearchText={setSearchText}
-        setPaidFilters={setPaidFilters}
-        setAddedFilters={setAddedFilters}
         showErrorDialog={showErrorDialog}
+        filterState={filterState}
+        setFilterState={setFilterState}
+        paidMenuOpen={paidMenuOpen}
+        setPaidMenuOpen={setPaidMenuOpen}
+        registeredMenuOpen={registeredMenuOpen}
+        setRegisteredMenuOpen={setRegisteredMenuOpen}
+        resetFilters={resetFilters}
       />
 
       <ErrorDialog
