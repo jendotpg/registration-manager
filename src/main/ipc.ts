@@ -44,6 +44,8 @@ export default function setupIPCs(mainWindow: BrowserWindow): void {
         updatingCheckboxes: [],
       },
     });
+
+    mainWindow.setTitle(mainWindow.webContents.getTitle());
   });
 
   ipcMain.removeHandler('openStartggLoginWindow');
@@ -73,6 +75,11 @@ export default function setupIPCs(mainWindow: BrowserWindow): void {
       mainWindow.webContents.send('tournament', {
         startggTournament: getCurrentTournament(),
       });
+
+      const baseTitle = mainWindow.webContents.getTitle();
+      mainWindow.setTitle(
+        tournament.name ? `${baseTitle} - ${tournament.name}` : baseTitle,
+      );
     }
 
     return tournament;

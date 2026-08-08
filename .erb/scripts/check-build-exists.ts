@@ -10,11 +10,6 @@ const rendererIndexPath = path.join(
   webpackPaths.distRendererPath,
   'renderer-index.js',
 );
-const rendererEnforcerPath = path.join(
-  webpackPaths.distRendererPath,
-  'renderer-enforcer.js',
-);
-
 if (!fs.existsSync(mainPath)) {
   throw new Error(
     chalk.whiteBright.bgRed.bold(
@@ -23,7 +18,7 @@ if (!fs.existsSync(mainPath)) {
   );
 }
 
-if (!fs.existsSync(rendererIndexPath) || !fs.existsSync(rendererEnforcerPath)) {
+if (!fs.existsSync(rendererIndexPath)) {
   throw new Error(
     chalk.whiteBright.bgRed.bold(
       'The renderer process is not built yet. Build it by running "npm run build:renderer"',
