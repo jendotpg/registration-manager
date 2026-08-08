@@ -14,6 +14,18 @@ module.exports = {
     'no-unused-vars': 'off',
     '@typescript-eslint/no-unused-vars': 'error',
   },
+  overrides: [
+    {
+      // Test factories render a component with sensible defaults and let each
+      // case override a prop or two. That reads far better as {...props} than
+      // as a hand-maintained list repeated in every helper, and none of this
+      // ships.
+      files: ['src/__tests__/**/*.{ts,tsx}', 'src/__fixtures__/**/*.{ts,tsx}'],
+      rules: {
+        'react/jsx-props-no-spreading': 'off',
+      },
+    },
+  ],
   parserOptions: {
     ecmaVersion: 2022,
     sourceType: 'module',

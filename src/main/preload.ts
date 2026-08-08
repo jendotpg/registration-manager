@@ -12,8 +12,6 @@ const electronHandler = {
   getCurrentTournament: (): Promise<Tournament | undefined> =>
     ipcRenderer.invoke('getCurrentTournament'),
   logOut: (): Promise<void> => ipcRenderer.invoke('logOut'),
-  getLoggedInStatus: (): Promise<boolean> =>
-    ipcRenderer.invoke('getLoggedInStatus'),
   getAdminedTournaments: (): Promise<void> =>
     ipcRenderer.invoke('getAdminedTournaments'),
   getStartggTournament: (slugOrShort: string): Promise<Tournament> =>

@@ -7,7 +7,6 @@
  *
  * @jest-environment node
  */
-import type { Cookie } from 'electron';
 import {
   DEFAULT_FILTER_STATE,
   FilterState,
@@ -23,17 +22,18 @@ import {
   poolsResponse,
   FakePoolEvent,
 } from '../__fixtures__/startgg';
+import {
+  COOKIES,
+  mockNycMelee,
+  REDEMPTION,
+  SINGLES,
+} from '../__fixtures__/nycMelee';
 import capturedEvents from '../__fixtures__/captured/tournamentEvents.json';
 import capturedParticipants from '../__fixtures__/captured/tournamentParticipants.json';
 import capturedPools from '../__fixtures__/captured/tournamentPools.json';
 
-const COOKIES: Cookie[] = [{ name: 'session', value: 'fake' } as Cookie];
-
-const SINGLES = 111;
-const REDEMPTION = 222;
-
-// eslint-disable-next-line global-require, @typescript-eslint/no-var-requires
 const loadStartgg = () =>
+  // eslint-disable-next-line global-require, @typescript-eslint/no-var-requires
   require('../main/startgg') as typeof import('../main/startgg');
 
 /** Every delay the throttle asked for, in order. */
@@ -60,68 +60,6 @@ beforeEach(() => {
 afterEach(() => {
   jest.restoreAllMocks();
 });
-
-/**
- * The NYC Melee shape: singles with two seeded pools plus a beast bracket that
- * is itself seeded with the entrants who progressed out of those pools.
- */
-function nycMeleePools(): FakePoolEvent[] {
-  return [
-    {
-      id: SINGLES,
-      pools: [
-        { id: 5001, phase: 'Pools', name: '1', entrantIds: [11, 12] },
-        { id: 5002, phase: 'Pools', name: '2', entrantIds: [13] },
-        {
-          id: 5003,
-          phase: 'Top 16 (Beast Bracket)',
-          phaseOrder: 2,
-          name: '1',
-          entrantIds: [11, 13],
-        },
-      ],
-    },
-    {
-      id: REDEMPTION,
-      pools: [{ id: 6001, phase: 'Redemption', name: '1', entrantIds: [21] }],
-    },
-  ];
-}
-
-const NYC_MELEE_PARTICIPANTS = [
-  {
-    id: 1,
-    gamerTag: 'Alice',
-    prefix: 'TSM',
-    entrantIds: [11],
-    eventIds: [SINGLES],
-    paidEventIds: [SINGLES],
-  },
-  { id: 2, gamerTag: 'Bob', entrantIds: [12], eventIds: [SINGLES] },
-  { id: 3, gamerTag: 'Carol', entrantIds: [13], eventIds: [SINGLES] },
-  // Registered for singles but never seeded.
-  { id: 4, gamerTag: 'Dave', entrantIds: [14], eventIds: [SINGLES] },
-  // Redemption only.
-  { id: 5, gamerTag: 'Erin', entrantIds: [21], eventIds: [REDEMPTION] },
-];
-
-function mockNycMelee(overrides: { poolEvents?: FakePoolEvent[] } = {}) {
-  return mockGql({
-    TournamentEvents: () =>
-      eventsResponse([
-        { id: SINGLES, name: 'Melee Singles' },
-        { id: REDEMPTION, name: 'Redemption Bracket' },
-      ]),
-    TournamentParticipants: () => participantsResponse(NYC_MELEE_PARTICIPANTS),
-    TournamentPools: (variables) =>
-      poolsResponse(overrides.poolEvents ?? nycMeleePools(), {
-        name: 'NYC Melee 100',
-        slug: 'tournament/nyc-melee-100',
-        groupPage: variables.groupPage,
-        seedPage: variables.seedPage,
-      }),
-  });
-}
 
 function optionFor(registrationOptions: any[], id: Id) {
   return registrationOptions.find((option) => option.id === id);
@@ -781,5 +719,214 @@ describe('getVisibleParticipantsText', () => {
     startgg.updateParticipantsFiltered('nobody', allPoolsOn(startgg));
 
     expect(startgg.getVisibleParticipantsText()).toBe('');
+  });
+});
+
+describe('getRegistration edge cases', () => {
+  const singlesEvents = () =>
+    eventsResponse([{ id: SINGLES, name: 'Melee Singles' }]);
+  const oneParticipant = () =>
+    participantsResponse([
+      { id: 1, gamerTag: 'Alice', entrantIds: [11], eventIds: [SINGLES] },
+    ]);
+
+  it('gives up when the API keeps promising more pages of phase groups', async () => {
+    // The mirror of the seed-page cap above, on the outer axis of the sweep.
+    const gql = mockGql({
+      TournamentEvents: singlesEvents,
+      TournamentParticipants: oneParticipant,
+      TournamentPools: (variables) => {
+        const response: any = poolsResponse(
+          [
+            {
+              id: SINGLES,
+              pools: [
+                { id: 5001, phase: 'Pools', name: '1', entrantIds: [11] },
+              ],
+            },
+          ],
+          { groupPage: variables.groupPage, seedPage: variables.seedPage },
+        );
+        response.tournament.events[0].paginatedPhaseGroups.pageInfo.totalPages = 99;
+        return response;
+      },
+    });
+    const { getRegistration } = loadStartgg();
+
+    const error: Error = await getRegistration(COOKIES, 'liar').then(
+      () => {
+        throw new Error('expected the sweep to give up');
+      },
+      (thrown) => thrown,
+    );
+    expect(error.message).toMatch(/pages of phase groups/);
+
+    const cap = Number(/more than (\d+) pages/.exec(error.message)![1]);
+    expect(gql.callsTo('TournamentPools')).toHaveLength(cap);
+  });
+
+  it('names the slug it could not find when the pools query returns no tournament', async () => {
+    mockGql({
+      TournamentEvents: singlesEvents,
+      TournamentParticipants: oneParticipant,
+      TournamentPools: () => ({ currentUser: { id: 1234 } }),
+    });
+    const { getRegistration } = loadStartgg();
+
+    await expect(getRegistration(COOKIES, 'ghost-tournament')).rejects.toThrow(
+      'No tournament found for slug: ghost-tournament',
+    );
+  });
+
+  it('falls back to empty strings for a tournament with no name or slug', async () => {
+    mockGql({
+      TournamentEvents: singlesEvents,
+      TournamentParticipants: oneParticipant,
+      TournamentPools: () => ({
+        currentUser: { id: 1234 },
+        tournament: { events: [] },
+      }),
+    });
+    const { getRegistration } = loadStartgg();
+
+    const registration = await getRegistration(COOKIES, 'nameless');
+
+    expect(registration!.name).toBe('');
+    expect(registration!.slug).toBe('');
+  });
+
+  it('copes with a tournament that has no events at all', async () => {
+    mockGql({
+      TournamentEvents: singlesEvents,
+      TournamentParticipants: oneParticipant,
+      TournamentPools: () => ({
+        currentUser: { id: 1234 },
+        tournament: { name: 'Empty', slug: 'tournament/empty' },
+      }),
+    });
+    const { getRegistration } = loadStartgg();
+
+    const registration = await getRegistration(COOKIES, 'empty');
+
+    expect(registration!.name).toBe('Empty');
+    // No pools came back, so the event offers no pool filter at all.
+    expect(optionFor(registration!.registrationOptions, SINGLES).pools).toEqual(
+      [],
+    );
+  });
+
+  it('stops at the events query when the session has already expired', async () => {
+    const gql = mockGql({ TournamentEvents: () => LOGGED_OUT_RESPONSE });
+    const { getRegistration } = loadStartgg();
+
+    await expect(
+      getRegistration(COOKIES, 'nyc-melee-100'),
+    ).resolves.toBeUndefined();
+    // No point paging through participants for a session that is gone.
+    expect(gql.calls).toHaveLength(1);
+  });
+
+  it('bails out when the session expires before any participant arrives', async () => {
+    const gql = mockGql({
+      TournamentEvents: singlesEvents,
+      TournamentParticipants: () => LOGGED_OUT_RESPONSE,
+      TournamentPools: () => poolsResponse([]),
+    });
+    const { getRegistration } = loadStartgg();
+
+    await expect(
+      getRegistration(COOKIES, 'nyc-melee-100'),
+    ).resolves.toBeUndefined();
+    // Events then participants, and then it gives up - no pool sweep.
+    expect(gql.callsTo('TournamentPools')).toHaveLength(0);
+  });
+
+  it('bails out when the session expires midway through paging participants', async () => {
+    mockGql({
+      TournamentEvents: singlesEvents,
+      TournamentParticipants: [
+        () =>
+          participantsResponse(
+            [
+              {
+                id: 1,
+                gamerTag: 'Alice',
+                entrantIds: [11],
+                eventIds: [SINGLES],
+              },
+            ],
+            { page: 1, totalPages: 2 },
+          ),
+        () => LOGGED_OUT_RESPONSE,
+      ],
+      TournamentPools: () => poolsResponse([]),
+    });
+    const { getRegistration } = loadStartgg();
+
+    await expect(
+      getRegistration(COOKIES, 'nyc-melee-100'),
+    ).resolves.toBeUndefined();
+  });
+
+  it('bails out when the session expires during the pool sweep', async () => {
+    mockGql({
+      TournamentEvents: singlesEvents,
+      TournamentParticipants: oneParticipant,
+      TournamentPools: () => LOGGED_OUT_RESPONSE,
+    });
+    const { getRegistration } = loadStartgg();
+
+    await expect(
+      getRegistration(COOKIES, 'nyc-melee-100'),
+    ).resolves.toBeUndefined();
+  });
+
+  it('seeds a participant who only arrived on the last page', async () => {
+    // Pool assignment happens after every page is in, so somebody at the back
+    // of a 300-person list still gets their pool.
+    mockGql({
+      TournamentEvents: singlesEvents,
+      TournamentParticipants: (variables) => {
+        const page = variables.page ?? 1;
+        const nodes = [
+          {
+            id: page,
+            gamerTag: `Player${page}`,
+            entrantIds: [10 + page],
+            eventIds: [SINGLES],
+          },
+        ];
+        return participantsResponse(nodes, { page, totalPages: 3 });
+      },
+      TournamentPools: (variables) =>
+        poolsResponse(
+          [
+            {
+              id: SINGLES,
+              pools: [
+                {
+                  id: 5001,
+                  phase: 'Pools',
+                  name: '1',
+                  entrantIds: [11, 12, 13],
+                },
+              ],
+            },
+          ],
+          { groupPage: variables.groupPage, seedPage: variables.seedPage },
+        ),
+    });
+    const { getRegistration } = loadStartgg();
+
+    const registration = await getRegistration(COOKIES, 'nyc-melee-100');
+
+    const lastArrival = registration!.participants.find(
+      (participant) => participant.displayName === 'Player3',
+    )!;
+    expect(lastArrival.pools[SINGLES]).toEqual({
+      id: 5001,
+      phase: 'Pools',
+      name: '1',
+    });
   });
 });

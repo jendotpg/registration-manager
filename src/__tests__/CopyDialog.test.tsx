@@ -1,32 +1,26 @@
 /**
  * @jest-environment jsdom
  */
-import '@testing-library/jest-dom';
-import { render, screen } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
-import { ThemeProvider, createTheme } from '@mui/material';
+import { act, screen } from '@testing-library/react';
 import CopyDialog from '../renderer/CopyDialog';
+import { installElectronMock } from '../__fixtures__/electronApi';
+import { renderWithTheme, setupUser } from '../__fixtures__/renderWithTheme';
 
 const PARTICIPANTS_TEXT = 'TSM|Alice, Bob, Carol, Dave, Erin';
 
-/**
- * The ripple settles on its own timer after a click resolves, which React
- * reports as an un-acted update. Nothing here tests the ripple, so turn it off.
- */
-const NO_RIPPLE = createTheme({
-  components: { MuiButtonBase: { defaultProps: { disableRipple: true } } },
-});
-
-const copyToClipboard = jest.fn<Promise<string>, []>();
+let electron: ReturnType<typeof installElectronMock>;
 
 beforeEach(() => {
-  jest.clearAllMocks();
-  copyToClipboard.mockResolvedValue(PARTICIPANTS_TEXT);
-  // Only the bits CopyDialog reaches for; the real bridge is Electron's.
-  (window as any).electron = { copyToClipboard };
+  electron = installElectronMock();
+  electron.api.copyToClipboard.mockResolvedValue(PARTICIPANTS_TEXT);
 });
 
-function themed({
+afterEach(() => {
+  electron.restore();
+  jest.clearAllMocks();
+});
+
+function dialog({
   open = true,
   text = PARTICIPANTS_TEXT,
   onClose = jest.fn(),
@@ -35,18 +29,13 @@ function themed({
   text?: string;
   onClose?: () => void;
 }) {
-  return (
-    <ThemeProvider theme={NO_RIPPLE}>
-      <CopyDialog open={open} text={text} onClose={onClose} />
-    </ThemeProvider>
-  );
+  return <CopyDialog open={open} text={text} onClose={onClose} />;
 }
 
-const renderDialog = (props: Parameters<typeof themed>[0] = {}) =>
-  render(themed(props));
+const renderDialog = (props: Parameters<typeof dialog>[0] = {}) =>
+  renderWithTheme(dialog(props));
 
 const copyButton = () => screen.getByRole('button', { name: /^Cop/ });
-const click = (element: HTMLElement) => userEvent.click(element);
 
 describe('CopyDialog', () => {
   it('shows the text in a field the user cannot edit', () => {
@@ -57,41 +46,72 @@ describe('CopyDialog', () => {
   });
 
   it('copies through the electron bridge when the button is clicked', async () => {
+    const user = setupUser();
     renderDialog();
 
-    await click(copyButton());
+    await user.click(copyButton());
 
-    expect(copyToClipboard).toHaveBeenCalledTimes(1);
+    expect(electron.api.copyToClipboard).toHaveBeenCalledTimes(1);
   });
 
   it('goes green and says Copied! after a copy', async () => {
+    const user = setupUser();
     renderDialog();
 
     expect(copyButton()).toHaveClass('MuiButton-containedPrimary');
 
-    await click(copyButton());
+    await user.click(copyButton());
 
     expect(copyButton()).toHaveTextContent('Copied!');
     expect(copyButton()).toHaveClass('MuiButton-containedSuccess');
   });
 
   it('is back to blue when the dialog is reopened', async () => {
-    const { rerender } = renderDialog();
-    await click(copyButton());
+    const user = setupUser();
+    const { rerenderWithTheme } = renderDialog();
+    await user.click(copyButton());
 
-    rerender(themed({ open: false }));
-    rerender(themed({ open: true }));
+    rerenderWithTheme(dialog({ open: false }));
+    rerenderWithTheme(dialog({ open: true }));
 
     expect(copyButton()).toHaveTextContent('Copy');
     expect(copyButton()).toHaveClass('MuiButton-containedPrimary');
   });
 
   it('closes on Close', async () => {
+    const user = setupUser();
     const onClose = jest.fn();
     renderDialog({ onClose });
 
-    await click(screen.getByRole('button', { name: 'Close' }));
+    await user.click(screen.getByRole('button', { name: 'Close' }));
 
     expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it('still offers a copy when there is nothing to copy', async () => {
+    const user = setupUser();
+    electron.api.copyToClipboard.mockResolvedValue('');
+    renderDialog({ text: '' });
+
+    await user.click(copyButton());
+
+    expect(electron.api.copyToClipboard).toHaveBeenCalledTimes(1);
+    expect(copyButton()).toHaveTextContent('Copied!');
+  });
+
+  it('selects the whole text on focus, so a manual copy grabs everything', async () => {
+    renderDialog();
+
+    const field = screen.getByDisplayValue(
+      PARTICIPANTS_TEXT,
+    ) as HTMLInputElement;
+    const select = jest.spyOn(field, 'select');
+
+    // MUI's InputBase tracks focus in state, so this is a React update.
+    await act(async () => {
+      field.focus();
+    });
+
+    expect(select).toHaveBeenCalled();
   });
 });

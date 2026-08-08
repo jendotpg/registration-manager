@@ -86,11 +86,15 @@ export default function StartggTournamentSelectorForm({
                 style={{
                   marginLeft: 'auto',
                 }}
-                onClick={() => {
+                onClick={async () => {
                   setGettingAdminedTournaments(true);
-                  window.electron.getAdminedTournaments().then(() => {
+                  try {
+                    await window.electron.getAdminedTournaments();
+                  } catch (e: any) {
+                    showErrorDialog([e instanceof Error ? e.message : e]);
+                  } finally {
                     setGettingAdminedTournaments(false);
-                  });
+                  }
                 }}
               >
                 <Refresh />

@@ -66,6 +66,57 @@ function getParticipant(id: Id) {
   );
 }
 
+const checkboxKey = (attendee: Id, option: Id) => `${attendee};${option}`;
+
+function clearUpdatingCheckbox(
+  tournament: Tournament,
+  attendee: Id,
+  option: Id,
+) {
+  const key = checkboxKey(attendee, option);
+  tournament.updatingCheckboxes = tournament.updatingCheckboxes.filter(
+    (updatingKey) => updatingKey != key,
+  );
+}
+
+type StatusSnapshot = {
+  paid: boolean | undefined;
+  registered: boolean | undefined;
+};
+const pendingRollbacks = new Map<string, StatusSnapshot>();
+
+function recordRollback(participant: Participant, option: Id) {
+  pendingRollbacks.set(checkboxKey(participant.id, option), {
+    paid: participant.paidStatuses[option],
+    registered: participant.registeredStatuses[option],
+  });
+}
+
+function restoreStatus(
+  statuses: Record<Id, boolean>,
+  option: Id,
+  previous: boolean | undefined,
+) {
+  if (previous === undefined) {
+    delete statuses[option];
+  } else {
+    statuses[option] = previous;
+  }
+}
+
+function rollBackToggle(attendee: Id, option: Id) {
+  const key = checkboxKey(attendee, option);
+  const snapshot = pendingRollbacks.get(key);
+  const participant = getParticipant(attendee);
+  if (snapshot === undefined || participant === undefined) {
+    return;
+  }
+
+  restoreStatus(participant.paidStatuses, option, snapshot.paid);
+  restoreStatus(participant.registeredStatuses, option, snapshot.registered);
+  applyFilters([participant]);
+}
+
 function poolFilterActive(filterState: FilterState) {
   return Object.values(filterState.pools).some((checked) => !checked);
 }
@@ -87,7 +138,9 @@ function applyFilters(participants: Participant[]) {
     return;
   }
 
-  const search = currentSearchText.toLowerCase();
+  // The table renders a prefix as "TSM | Alice" but the haystack below joins it
+  // as "TSM|Alice", so someone typing what is on screen has to still match.
+  const search = currentSearchText.toLowerCase().replace(/\s*\|\s*/g, '|');
 
   const eventOptionIds = new Set(
     currentTournament.registrationOptions
@@ -162,15 +215,19 @@ async function wrappedFetch(
     ) {
       return new Promise((resolve, reject) => {
         setTimeout(async () => {
-          const retryResponse = await fetch(input, init);
-          if (!retryResponse.ok) {
-            reject(
-              new Error(
-                `${retryResponse.status} - ${retryResponse.statusText}`,
-              ),
-            );
-          } else {
-            resolve(retryResponse);
+          try {
+            const retryResponse = await fetch(input, init);
+            if (!retryResponse.ok) {
+              reject(
+                new Error(
+                  `${retryResponse.status} - ${retryResponse.statusText}`,
+                ),
+              );
+            } else {
+              resolve(retryResponse);
+            }
+          } catch {
+            reject(new Error('***You may not be connected to the internet***'));
           }
         }, 1000);
       });
@@ -202,6 +259,8 @@ export async function getTournament(cookies: Cookie[], slug: string) {
       currentSearchText = '';
       currentFilters = {};
     }
+
+    pendingRollbacks.clear();
 
     currentTournament = tournament;
     applyFilters(currentTournament.participants);
@@ -390,21 +449,21 @@ export function ingestEvents(
       id = rawRegistrationOption['values'][0]['optionTypeId'];
     }
 
-    id
-      ? registrationOptions.push({
-          id: id,
-          name: rawRegistrationOption['name'],
-          type: rawRegistrationOption['optionType'],
-          started: startedEvents.includes(id),
-          free: rawRegistrationOption['values'][0]['fee'] == 0,
-          options: rawRegistrationOption['values'].map(
-            (value: Record<string, string>) => value['name'],
-          ),
-          ...(rawRegistrationOption['optionType'] == 'event'
-            ? { pools: [] }
-            : {}),
-        })
-      : {};
+    if (id !== undefined) {
+      registrationOptions.push({
+        id: id,
+        name: rawRegistrationOption['name'],
+        type: rawRegistrationOption['optionType'],
+        started: startedEvents.includes(id),
+        free: rawRegistrationOption['values'][0]['fee'] == 0,
+        options: rawRegistrationOption['values'].map(
+          (value: Record<string, string>) => value['name'],
+        ),
+        ...(rawRegistrationOption['optionType'] == 'event'
+          ? { pools: [] }
+          : {}),
+      });
+    }
   }
 }
 
@@ -739,6 +798,8 @@ export async function updateParticipantRegistration(
     return;
   }
 
+  const tournament = currentTournament;
+
   const eventIds = Object.entries(participant.registeredStatuses)
     .filter(([, registered]) => registered)
     .map(([eventId]) => eventId);
@@ -759,37 +820,43 @@ export async function updateParticipantRegistration(
       paidEventIds: paidIds,
     },
     GQL_TYPE.MUTATION,
-  ).then((queryResponse) => {
-    const currentParticipant = getParticipant(attendee);
-    if (currentTournament == undefined || currentParticipant == undefined) {
-      return;
-    }
-
-    currentParticipant.paidStatuses = {};
-    currentParticipant.registeredStatuses = {};
-    for (let registrationSelection of queryResponse[
-      'updateParticipantRegistration'
-    ]['registrationSelections']) {
-      const balance = registrationSelection['balance'];
-      if (registrationSelection['regValue']['optionType'] == 'event') {
-        const eventId = registrationSelection['regValue']['optionTypeId'];
-        currentParticipant.registeredStatuses[eventId] = true;
-        currentParticipant.paidStatuses[eventId] = balance == 0;
-      } else if (
-        registrationSelection['regValue']['optionType'] == 'tournament'
-      ) {
-        const eventId = registrationSelection['regValue']['id'];
-        currentParticipant.paidStatuses[eventId] = balance == 0;
+  ).then(
+    (queryResponse) => {
+      const currentParticipant = getParticipant(attendee);
+      pendingRollbacks.delete(checkboxKey(attendee, option));
+      if (currentTournament == undefined || currentParticipant == undefined) {
+        return;
       }
-    }
 
-    currentTournament.updatingCheckboxes =
-      currentTournament.updatingCheckboxes.filter(
-        (key) => key != `${attendee};${option}`,
-      );
+      currentParticipant.paidStatuses = {};
+      currentParticipant.registeredStatuses = {};
+      for (let registrationSelection of queryResponse[
+        'updateParticipantRegistration'
+      ]['registrationSelections']) {
+        const balance = registrationSelection['balance'];
+        if (registrationSelection['regValue']['optionType'] == 'event') {
+          const eventId = registrationSelection['regValue']['optionTypeId'];
+          currentParticipant.registeredStatuses[eventId] = true;
+          currentParticipant.paidStatuses[eventId] = balance == 0;
+        } else if (
+          registrationSelection['regValue']['optionType'] == 'tournament'
+        ) {
+          const eventId = registrationSelection['regValue']['id'];
+          currentParticipant.paidStatuses[eventId] = balance == 0;
+        }
+      }
 
-    applyFilters([currentParticipant]);
-  });
+      clearUpdatingCheckbox(tournament, attendee, option);
+
+      applyFilters([currentParticipant]);
+    },
+    (e) => {
+      rollBackToggle(attendee, option);
+      pendingRollbacks.delete(checkboxKey(attendee, option));
+      clearUpdatingCheckbox(tournament, attendee, option);
+      throw e;
+    },
+  );
 }
 
 export function getVisibleParticipantsText() {
@@ -817,6 +884,8 @@ export async function toggleParticipantPaid(attendee: Id, option: Id) {
     return;
   }
 
+  recordRollback(participant, option);
+
   const justPaid = !participant.paidStatuses[option];
   participant.paidStatuses[option] = justPaid;
 
@@ -827,7 +896,7 @@ export async function toggleParticipantPaid(attendee: Id, option: Id) {
     participant.registeredStatuses[option] = true;
   }
 
-  currentTournament.updatingCheckboxes.push(`${attendee};${option}`);
+  currentTournament.updatingCheckboxes.push(checkboxKey(attendee, option));
 }
 
 export async function toggleParticipantAdded(attendee: Id, option: Id) {
@@ -836,9 +905,11 @@ export async function toggleParticipantAdded(attendee: Id, option: Id) {
     return;
   }
 
+  recordRollback(participant, option);
+
   participant.registeredStatuses[option] =
     !participant.registeredStatuses[option];
-  currentTournament.updatingCheckboxes.push(`${attendee};${option}`);
+  currentTournament.updatingCheckboxes.push(checkboxKey(attendee, option));
 }
 
 const GET_TOURNAMENTS_QUERY = `

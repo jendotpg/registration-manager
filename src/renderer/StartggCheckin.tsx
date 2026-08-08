@@ -57,7 +57,7 @@ const SMALL_ICON_BUTTON_SX = {
   height: `${SMALL_CONTROL_PX}px`,
 } as const;
 
-function disabledReason(
+export function disabledReason(
   startggTournament: Tournament,
   tournamentParticipant: Participant,
   registrationOption: RegistrationOption,
@@ -354,9 +354,10 @@ export default function StartggCheckin({
                         await window.electron.getStartggTournament(
                           startggTournament.slug,
                         );
-                        setGettingTournament(false);
                       } catch (e: any) {
                         showErrorDialog([e instanceof Error ? e.message : e]);
+                      } finally {
+                        setGettingTournament(false);
                       }
                     }}
                   >
@@ -431,7 +432,7 @@ export default function StartggCheckin({
                           onClick={() => openPaidMenu(id)}
                         />
                         <PaidMenu
-                          anchorEl={paidButtonRefs.current[id]}
+                          anchorEl={paidButtonRefs.current[id] ?? null}
                           open={!!paidMenuOpen[id]}
                           onClose={() => closePaidMenu(id)}
                           paidState={filter.paid}
@@ -449,7 +450,9 @@ export default function StartggCheckin({
                               onClick={() => openRegisteredMenu(id)}
                             />
                             <AddedMenu
-                              anchorEl={registeredButtonRefs.current[id]}
+                              anchorEl={
+                                registeredButtonRefs.current[id] ?? null
+                              }
                               open={!!registeredMenuOpen[id]}
                               onClose={() => closeRegisteredMenu(id)}
                               addedState={filter.added}

@@ -39,7 +39,9 @@
     "start:main": "cross-env NODE_ENV=development electronmon -r ts-node/register/transpile-only .",
     "start:preload": "cross-env NODE_ENV=development TS_NODE_TRANSPILE_ONLY=true webpack --config ./.erb/configs/webpack.config.preload.dev.ts",
     "start:renderer": "cross-env NODE_ENV=development TS_NODE_TRANSPILE_ONLY=true webpack serve --config ./.erb/configs/webpack.config.renderer.dev.ts",
-    "test": "jest"
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage"
   },
   "browserslist": [],
   "prettier": {
@@ -71,11 +73,57 @@
     ],
     "moduleNameMapper": {
       "\\.(jpg|jpeg|png|gif|eot|otf|webp|svg|ttf|woff|woff2|mp4|webm|wav|mp3|m4a|aac|oga)$": "<rootDir>/.erb/mocks/fileMock.js",
-      "\\.(css|less|sass|scss)$": "identity-obj-proxy"
+      "\\.(css|less|sass|scss)$": "<rootDir>/.erb/mocks/fileMock.js",
+      "^@mui/material/Tooltip/Tooltip$": "<rootDir>/node_modules/@mui/material/Tooltip/Tooltip.js"
     },
     "setupFiles": [
-      "./.erb/scripts/check-build-exists.ts"
+      "<rootDir>/src/__fixtures__/jestSetup.ts"
     ],
+    "setupFilesAfterEnv": [
+      "<rootDir>/src/__fixtures__/jestSetupAfterEnv.ts"
+    ],
+    "collectCoverageFrom": [
+      "src/**/*.{ts,tsx}",
+      "!src/**/*.d.ts",
+      "!src/__fixtures__/**",
+      "!src/__tests__/**",
+      "!src/main/main.ts",
+      "!src/main/menu.ts",
+      "!src/main/loginwindow.ts",
+      "!src/main/preload.ts",
+      "!src/renderer/index.tsx"
+    ],
+    "coverageDirectory": "coverage",
+    "coverageReporters": [
+      "text-summary",
+      "lcov"
+    ],
+    "coverageThreshold": {
+      "global": {
+        "statements": 99,
+        "branches": 90,
+        "functions": 100,
+        "lines": 95
+      },
+      "src/main/ipc.ts": {
+        "statements": 100,
+        "branches": 100,
+        "functions": 100,
+        "lines": 100
+      },
+      "src/main/util.ts": {
+        "statements": 100,
+        "branches": 100,
+        "functions": 100,
+        "lines": 100
+      },
+      "src/main/startgg.ts": {
+        "statements": 99,
+        "branches": 90,
+        "functions": 100,
+        "lines": 95
+      }
+    },
     "testEnvironment": "jsdom",
     "testEnvironmentOptions": {
       "url": "http://localhost/"
@@ -148,6 +196,9 @@
     "webpack-cli": "^5.1.4",
     "webpack-dev-server": "^4.15.1",
     "webpack-merge": "^5.9.0"
+  },
+  "overrides": {
+    "tr46": "^5.1.1"
   },
   "build": {
     "productName": "Start.gg Registration Manager",

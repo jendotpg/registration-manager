@@ -10,21 +10,25 @@ import {
 } from '../common/types';
 import Settings from './Settings';
 import StartggCheckin from './StartggCheckin';
-import { WindowEvent } from './setWindowEventListener';
 import ErrorDialog from './ErrorDialog';
 import CopyDialog from './CopyDialog';
 
 // TODO: set up testing
-// TODO: fix all the warnings / linting errors...
+
+// TODO: fix linter issues
+
+// TODO: performance fixes - the whole interface slows down a LOT with big events...
+// // debounce searchText inputs
+// // put checkboxes in react-window List to only render visible ones
+// // figure out wtf is going on with clicking filter icons ??
+// // some sort of performance testing
 
 // TODO: fix building!! we're hardcoding the fucking python path LMFAOOO. i also cant build x86 windows binaries. use github actions?
 
-// TODO: implement undo / redo tree?
-// TODO: performance fixes - the whole interface slows down a LOT with big events...
-
-// TODO: main/startgg.ts and main/ipc.ts are coupled weirdly i think - look into this further... (the smell for me is copy text being generated in startgg - feels like the wrong place)
-// TODO: improve teams handling?
+// TODO: implement undo / redo tree? is this a footgun for tos?
+// TODO: improve teams handling? how does the interface for this work - third column for teams events? new page for teams?
 // TODO: support for add participant?
+// // also, figure out how to pull discriminators for participants - and put it into the tooltip
 // TODO: reconsider login flow?
 
 function IndexPage() {
@@ -102,17 +106,6 @@ function IndexPage() {
   }, []);
 
   useEffect(() => {
-    window.electron.refreshTournament((e) => {
-      if (startggTournament.slug) {
-        setGettingTournament(true);
-        window.electron
-          .getStartggTournament(startggTournament.slug)
-          .then(() => setGettingTournament(false));
-      }
-    });
-  }, [startggTournament]);
-
-  useEffect(() => {
     setGettingAdminedTournaments(true);
     window.electron
       .getAdminedTournaments()
@@ -135,13 +128,20 @@ function IndexPage() {
 
     setGettingTournament(true);
     try {
-      const tournament = await window.electron.getStartggTournament(maybeSlug);
-      setGettingTournament(false);
-      return tournament;
+      return await window.electron.getStartggTournament(maybeSlug);
     } catch (e: any) {
-      showErrorDialog([e.toString()]);
+      showErrorDialog([e instanceof Error ? e.message : e]);
+      return undefined;
+    } finally {
+      setGettingTournament(false);
     }
   };
+
+  useEffect(() => {
+    window.electron.refreshTournament(() => {
+      getStartggTournament(startggTournament.slug);
+    });
+  }, [startggTournament]);
 
   const [searchText, setSearchText] = useState('');
   const [filterState, setFilterState] = useState<Record<Id, FilterState>>({});
@@ -271,7 +271,6 @@ function IndexPage() {
       />
       <GlobalHotKeys
         keyMap={{
-          ESC: 'escape',
           FIND: window.electron.isMac
             ? ['command+f', 'command+F']
             : ['ctrl+f', 'ctrl+F'],
@@ -280,19 +279,11 @@ function IndexPage() {
             : ['ctrl+r', 'ctrl+R'],
         }}
         handlers={{
-          ESC: () => {
-            window.dispatchEvent(new Event(WindowEvent.ESCAPE));
-          },
           FIND: () => {
             document?.getElementById('search-bar')?.focus();
           },
           REFRESH: () => {
-            if (startggTournamentRef.current.slug) {
-              setGettingTournament(true);
-              window.electron
-                .getStartggTournament(startggTournamentRef.current.slug)
-                .then(() => setGettingTournament(false));
-            }
+            getStartggTournament(startggTournamentRef.current.slug);
           },
         }}
       />
