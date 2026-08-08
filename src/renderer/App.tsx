@@ -13,13 +13,13 @@ import StartggCheckin from './StartggCheckin';
 import ErrorDialog from './ErrorDialog';
 import CopyDialog from './CopyDialog';
 
+// TODO: fix building!! we're hardcoding the fucking python path LMFAOOO. i also cant build x86 windows binaries. use github actions?
+
 // TODO: performance fixes - the whole interface slows down a LOT with big events...
 // // debounce searchText inputs
 // // put checkboxes in react-window List to only render visible ones
 // // figure out wtf is going on with clicking filter icons ??
 // // some sort of performance testing
-
-// TODO: fix building!! we're hardcoding the fucking python path LMFAOOO. i also cant build x86 windows binaries. use github actions?
 
 // TODO: implement undo / redo tree? is this a footgun for tos?
 // TODO: improve teams handling? how does the interface for this work - third column for teams events? new page for teams?

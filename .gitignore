@@ -23,6 +23,7 @@ release/build
 .erb/dll
 
 .idea
+__pycache__
 npm-debug.log.*
 *.css.d.ts
 *.sass.d.ts

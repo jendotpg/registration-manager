@@ -1,0 +1,137 @@
+name: Publish
+
+# The ONLY workflow that can produce a GitHub Release.
+#
+# It triggers on nothing but a `v*` tag push. `git push origin main` sends no tags (git never
+# pushes tags unless you name one or pass --tags), so a normal push cannot queue this workflow
+# at all. And because package.json sets build.publish.releaseType to "draft", a successful run
+# produces a *draft* release: invisible without write access, absent from the Releases page,
+# and not served by /releases/latest until a human clicks "Publish release".
+on:
+  push:
+    tags:
+      - 'v*'
+
+# Required for electron-builder to upload assets using the automatically-provided
+# secrets.GITHUB_TOKEN. Removing this line makes every upload 403.
+permissions:
+  contents: write
+
+jobs:
+  # electron-builder names the release after the *package* version, not the tag that triggered
+  # the run. Without this check, tagging v0.2.0 while package.json still says 0.1.0 would
+  # silently publish into a release named v0.1.0.
+  verify:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out Git repository
+        uses: actions/checkout@v4
+
+      - name: Verify tag matches both package.json versions
+        shell: bash
+        run: |
+          tag="${GITHUB_REF_NAME#v}"
+          # build.directories.app is release/app, so THIS is the version electron-builder uses.
+          app=$(node -p "require('./release/app/package.json').version")
+          root=$(node -p "require('./package.json').version")
+          echo "tag=$tag release/app=$app root=$root"
+          if [ "$tag" != "$app" ] || [ "$tag" != "$root" ]; then
+            echo "::error::Tag $GITHUB_REF_NAME does not match release/app/package.json ($app) and/or package.json ($root). Run 'npm run version:set $tag' and re-tag."
+            exit 1
+          fi
+
+  # Create the empty draft up front so the three build jobs below only ever *find* it. If they
+  # each ran electron-builder's "find or create" logic concurrently they could race and leave
+  # duplicate drafts behind.
+  draft:
+    needs: verify
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out Git repository
+        uses: actions/checkout@v4
+
+      - name: Create draft release if absent
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            echo "Draft $GITHUB_REF_NAME already exists, reusing it."
+          else
+            gh release create "$GITHUB_REF_NAME" \
+              --draft \
+              --title "$GITHUB_REF_NAME" \
+              --notes ""
+          fi
+
+  build:
+    needs: draft
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      # Don't let one platform failing cancel the others — a partial draft is easier to
+      # inspect than no draft, and you can re-run the single failed job.
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            platform: --mac
+          - os: windows-latest
+            platform: --win
+          - os: ubuntu-latest
+            platform: --linux
+
+    steps:
+      - name: Check out Git repository
+        uses: actions/checkout@v4
+
+      # build.afterPack (.erb/scripts/mach-o-uuid.js) shells out to mach-o-uuid.py via
+      # python-shell when building the universal mac target.
+      - name: Install Python (for Mach-O UUID rewrite)
+        if: matrix.os == 'macos-latest'
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      # mach-o-uuid.py tries to `pip install macholib` itself at build time, which fails on any
+      # PEP 668 externally-managed Python. Install it up front so the build doesn't depend on
+      # that working, and so a missing dep fails here with a clear error instead of deep inside
+      # electron-builder's afterPack.
+      - name: Install macholib
+        if: matrix.os == 'macos-latest'
+        run: python3 -m pip install macholib
+
+      - name: Install Node.js and NPM
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: npm install
+        run: npm install
+
+      - name: Lint, typecheck, test
+        run: |
+          npm run lint
+          npm exec tsc
+          npm test
+
+      - name: Build bundles
+        run: npm run build
+
+      # Not `npm run package` — that script hardcodes `--publish never`.
+      - name: Build installer and upload to draft release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Builds are currently unsigned (build.mac.identity is null), so users get a
+          # Gatekeeper warning on macOS and SmartScreen on Windows. To sign and notarize:
+          # add these five repo secrets and uncomment. .erb/scripts/notarize.js already
+          # self-skips whenever APPLE_ID is unset, so nothing else needs to change.
+          #
+          # APPLE_ID: ${{ secrets.APPLE_ID }}
+          # APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          # APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          # CSC_LINK: ${{ secrets.CSC_LINK }}
+          # CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+        run: npx electron-builder --publish always ${{ matrix.platform }}

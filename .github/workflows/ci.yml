@@ -1,0 +1,123 @@
+name: CI
+
+# Runs on every push and PR. This workflow can NOT create a release: it only ever produces
+# workflow artifacts (the expiring zips at the bottom of a run page), and `npm run package`
+# is hardcoded to `electron-builder build --publish never`.
+# Releases are handled exclusively by publish.yml, which only triggers on `v*` tags.
+#
+# Scoped to branches so a tag push doesn't run this and publish.yml at once — publish.yml
+# runs the same lint/typecheck/test steps itself before it builds anything.
+on:
+  push:
+    branches: ['**']
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  macos:
+    runs-on: macos-latest
+
+    steps:
+      - name: Check out Git repository
+        uses: actions/checkout@v4
+
+      # build.afterPack (.erb/scripts/mach-o-uuid.js) shells out to mach-o-uuid.py via
+      # python-shell when building the universal mac target.
+      - name: Install Python (for Mach-O UUID rewrite)
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      # mach-o-uuid.py tries to `pip install macholib` itself at build time, which fails on any
+      # PEP 668 externally-managed Python. Install it up front so the build doesn't depend on
+      # that working, and so a missing dep fails here with a clear error instead of deep inside
+      # electron-builder's afterPack.
+      - name: Install macholib
+        run: python3 -m pip install macholib
+
+      - name: Install Node.js and NPM
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: npm install
+        run: npm install
+
+      - name: Lint, typecheck, package, test
+        run: |
+          npm run lint
+          npm exec tsc
+          npm run package
+          npm test
+
+      - name: Upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos
+          path: release/build/*.dmg
+          retention-days: 14
+
+  windows:
+    runs-on: windows-latest
+
+    steps:
+      - name: Check out Git repository
+        uses: actions/checkout@v4
+
+      - name: Install Node.js and NPM
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: npm install
+        run: npm install
+
+      - name: Lint, typecheck, package, test
+        run: |
+          npm run lint
+          npm exec tsc
+          npm run package
+          npm test
+
+      - name: Upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows
+          path: release/build/*.exe
+          retention-days: 14
+
+  ubuntu:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out Git repository
+        uses: actions/checkout@v4
+
+      - name: Install Node.js and NPM
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: npm install
+        run: npm install
+
+      - name: Lint, typecheck, package, test
+        run: |
+          npm run lint
+          npm exec tsc
+          npm run package
+          npm test
+
+      - name: Upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: ubuntu
+          path: release/build/*.AppImage
+          retention-days: 14

@@ -41,7 +41,8 @@
     "start:renderer": "cross-env NODE_ENV=development TS_NODE_TRANSPILE_ONLY=true webpack serve --config ./.erb/configs/webpack.config.renderer.dev.ts",
     "test": "jest",
     "test:watch": "jest --watch",
-    "test:coverage": "jest --coverage"
+    "test:coverage": "jest --coverage",
+    "version:set": "node .erb/scripts/set-version.js"
   },
   "browserslist": [],
   "prettier": {
@@ -205,6 +206,13 @@
     "appId": "org.jpg.CheckinManager",
     "asar": true,
     "asarUnpack": "**\\*.{node,dll}",
+    "artifactName": "StartggRegistrationManager-${version}-${arch}.${ext}",
+    "publish": {
+      "provider": "github",
+      "owner": "jendotpg",
+      "repo": "registration-manager",
+      "releaseType": "draft"
+    },
     "files": [
       "dist",
       "node_modules",
