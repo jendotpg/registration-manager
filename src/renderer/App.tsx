@@ -15,15 +15,14 @@ import ErrorDialog from './ErrorDialog';
 import CopyDialog from './CopyDialog';
 
 // TODO: set up testing
-// TODO: write a README
 // TODO: fix all the warnings / linting errors...
-
-// TODO: performance fix for filtering - it slows down a LOT with big events...
 
 // TODO: fix building!! we're hardcoding the fucking python path LMFAOOO. i also cant build x86 windows binaries. use github actions?
 
-// TODO: main/startgg.ts and main/ipc.ts are coupled weirdly i think - look into this further... (the smell for me is copy text being generated in startgg - feels like the wrong place)
 // TODO: implement undo / redo tree?
+// TODO: performance fixes - the whole interface slows down a LOT with big events...
+
+// TODO: main/startgg.ts and main/ipc.ts are coupled weirdly i think - look into this further... (the smell for me is copy text being generated in startgg - feels like the wrong place)
 // TODO: improve teams handling?
 // TODO: support for add participant?
 // TODO: reconsider login flow?
