@@ -267,9 +267,21 @@ describe('fetchUnofficialGql', () => {
     await expect(run()).resolves.toEqual([]);
   });
 
-  it('surfaces a body that is not JSON as the parse error', async () => {
+  it('reads a body that is not JSON as logged out', async () => {
+    // Stale cookies get an HTML page back with a 200, so the parse fails before
+    // the currentUser check ever runs. Letting the SyntaxError out means the app
+    // greets you at startup with "Unexpected non-whitespace character after JSON
+    // at position 1192" instead of the login window.
     const { run } = callWith(malformedJson());
 
-    await expect(run()).rejects.toThrow(SyntaxError);
+    await expect(run()).resolves.toBeUndefined();
+  });
+
+  it('still reads a body that is not JSON as logged out when it parses partway', async () => {
+    // JSON.parse gets far enough to build a value and then hits trailing junk -
+    // a different SyntaxError, on a body that is just as unusable.
+    const { run } = callWith(malformedJson('{"data":{}} trailing junk'));
+
+    await expect(run()).resolves.toBeUndefined();
   });
 });

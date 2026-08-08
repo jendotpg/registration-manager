@@ -273,7 +273,16 @@ async function fetchUnofficialGql(
     body: JSON.stringify({ query, variables }),
   });
 
-  const json = await response.json();
+  let json;
+  try {
+    json = await response.json();
+  } catch {
+    if (type === GQL_TYPE.QUERY) {
+      return undefined;
+    }
+    throw new Error('***start.gg login expired, please log in again!***');
+  }
+
   if (Array.isArray(json.errors) && json.errors.length > 0) {
     const message = json.errors[0].message as string;
     const retryMsg = '';

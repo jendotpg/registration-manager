@@ -18,6 +18,7 @@ import {
   gqlErrors,
   httpStatus,
   LOGGED_OUT_RESPONSE,
+  malformedJson,
   mockGql,
   updateRegistrationResponse,
   VENUE_FEE_REG_VALUE_ID,
@@ -442,6 +443,21 @@ describe('updateParticipantRegistration', () => {
     await expect(
       startgg.updateParticipantRegistration(COOKIES, ALICE, SINGLES),
     ).rejects.toThrow('Nope');
+
+    expect(startgg.getCurrentTournament()!.updatingCheckboxes).toEqual([]);
+  });
+
+  it('names the expired session when a mutation comes back as a login page', async () => {
+    // A query can answer "logged out" by resolving undefined, but a mutation's
+    // caller reads fields straight off the response, so this branch has to
+    // throw - and it has to throw something the desk can act on rather than a
+    // JSON parse error from deep inside undici.
+    const { startgg } = await loadWithMutation(malformedJson());
+    await startgg.toggleParticipantPaid(ALICE, SINGLES);
+
+    await expect(
+      startgg.updateParticipantRegistration(COOKIES, ALICE, SINGLES),
+    ).rejects.toThrow('***start.gg login expired, please log in again!***');
 
     expect(startgg.getCurrentTournament()!.updatingCheckboxes).toEqual([]);
   });

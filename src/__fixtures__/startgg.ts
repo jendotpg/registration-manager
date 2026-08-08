@@ -322,8 +322,11 @@ export type FixtureResponse = {
   statusText: string;
   /** Thrown by `fetch` itself, before any response exists. */
   rejectsWith?: Error;
-  /** Thrown by `response.json()`. */
-  jsonThrows?: Error;
+  /**
+   * An unparsed body, handed to `JSON.parse` as-is by `response.json()`. Use it
+   * to make the parse fail for real rather than with a hand-written error.
+   */
+  rawBody?: string;
   body?: unknown;
 };
 
@@ -401,14 +404,26 @@ export function networkFailure(
   };
 }
 
-/** 200 OK whose body isn't JSON. */
-export function malformedJson(): FixtureResponse {
+/**
+ * 200 OK whose body isn't JSON.
+ *
+ * This is what a stale cookie jar gets: start.gg answers the unofficial
+ * endpoint with a page instead of a GraphQL envelope, and `response.json()`
+ * blows up before any of our own logged-out handling gets a look in. The
+ * default body reproduces the shape seen in the wild - a JSON envelope with a
+ * second line of markup stuck on the end, which is why the real error reads
+ * "Unexpected non-whitespace character after JSON" rather than the more obvious
+ * "Unexpected token <".
+ */
+export function malformedJson(
+  rawBody = `{"redirect":"https:\\/\\/start.gg\\/login"}\n<!DOCTYPE html><html><body>Log in to start.gg</body></html>`,
+): FixtureResponse {
   return {
     [RESPONSE_TAG]: true,
     ok: true,
     status: 200,
     statusText: 'OK',
-    jsonThrows: new SyntaxError('Unexpected token < in JSON at position 0'),
+    rawBody,
   };
 }
 
@@ -511,8 +526,8 @@ export function mockGql(handlers: {
       status: response.status,
       statusText: response.statusText,
       json: async () => {
-        if (response.jsonThrows) {
-          throw response.jsonThrows;
+        if (response.rawBody !== undefined) {
+          return JSON.parse(response.rawBody);
         }
         return response.body;
       },
