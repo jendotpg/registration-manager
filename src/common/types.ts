@@ -33,31 +33,43 @@ export const matchesNullableBoolean = (
 
 export type Id = number;
 
+export type Pool = {
+  id: Id;
+  phase: string;
+  name: string;
+};
+
+export const UNSEEDED_POOL_ID: Id = -1;
+
+export const UNSEEDED_POOL: Pool = {
+  id: UNSEEDED_POOL_ID,
+  phase: 'Unseeded',
+  name: '',
+};
+
+export const poolLabel = (pool: Pool) => `${pool.phase} ${pool.name}`.trim();
+
 export type Participant = {
   id: Id;
   displayName: string;
   prefix: string;
   filtered: boolean;
-  paidStatuses: Record<Id, boolean>;
-  /**
-   * Keyed by event option id only. There is no "added to the venue" boolean -
-   * every operation here acts on entrants already registered for the tournament,
-   * so tournament-type options carry a paid status and nothing else.
-   */
+  paidStatuses: Record<Id, boolean>; // includes "venue fee" category
   registeredStatuses: Record<Id, boolean>;
+  // DOESNT include "venue fee" category - obviously youre registered
+  // for venue if youre in the event...
+  pools: Record<Id, Pool>;
 };
 
 export type FilterState = {
   paid: NullableBoolean;
   added: NullableBoolean;
-  dqd: NullableBoolean;
-  pools: Record<string, boolean>;
+  pools: Record<Id, boolean>;
 };
 
 export const DEFAULT_FILTER_STATE: FilterState = {
   paid: NullableBoolean.Indeterminate,
   added: NullableBoolean.Indeterminate,
-  dqd: NullableBoolean.Indeterminate,
   pools: {},
 };
 
@@ -68,6 +80,7 @@ export type RegistrationOption = {
   started: boolean;
   free: boolean;
   options: string[];
+  pools?: Pool[];
 };
 
 export type Tournament = {

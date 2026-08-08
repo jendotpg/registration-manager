@@ -4,9 +4,12 @@ import {
   Id,
   Tournament,
   Participant,
+  Pool,
   RegistrationOption,
   FilterState,
   NullableBoolean,
+  UNSEEDED_POOL,
+  UNSEEDED_POOL_ID,
   matchesNullableBoolean,
 } from '../common/types';
 
@@ -15,6 +18,38 @@ let venueFeeOption: Id | undefined;
 
 let currentSearchText = '';
 let currentFilters: Record<Id, FilterState> = {};
+
+const PARTICIPANT_PER_PAGE = 100;
+const GROUP_PER_PAGE = 10;
+const SEED_PER_PAGE = 50;
+const MAX_POOL_PAGES = 4;
+const MAX_PARTICIPANT_PAGES = 50;
+const FREE_REQUESTS = 10;
+const MIN_PAGINATION_DELAY_MS = 50;
+const MAX_PAGINATION_DELAY_MS = 300;
+const PAGINATION_DELAY_STEP_MS = 50;
+
+const sleep = (ms: number) =>
+  new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+
+function makeRequestThrottle() {
+  let requests = 0;
+  return async () => {
+    requests += 1;
+    if (requests <= FREE_REQUESTS) {
+      return;
+    }
+    await sleep(
+      Math.min(
+        MAX_PAGINATION_DELAY_MS,
+        MIN_PAGINATION_DELAY_MS +
+          (requests - FREE_REQUESTS - 1) * PAGINATION_DELAY_STEP_MS,
+      ),
+    );
+  };
+}
 
 enum GQL_TYPE {
   MUTATION,
@@ -29,6 +64,22 @@ function getParticipant(id: Id) {
   return currentTournament?.participants.find(
     (participant) => participant.id === id,
   );
+}
+
+function poolFilterActive(filterState: FilterState) {
+  return Object.values(filterState.pools).some((checked) => !checked);
+}
+
+function matchesPoolFilter(
+  filterState: FilterState,
+  participant: Participant,
+  optionId: Id,
+) {
+  if (!poolFilterActive(filterState)) {
+    return true;
+  }
+  const pool = participant.pools[optionId];
+  return !!filterState.pools[pool ? pool.id : UNSEEDED_POOL_ID];
 }
 
 function applyFilters(participants: Participant[]) {
@@ -49,8 +100,9 @@ function applyFilters(participants: Participant[]) {
     .filter(
       ([optionId, filterState]) =>
         filterState.paid !== NullableBoolean.Indeterminate ||
-        (filterState.added !== NullableBoolean.Indeterminate &&
-          eventOptionIds.has(optionId)),
+        (eventOptionIds.has(optionId) &&
+          (filterState.added !== NullableBoolean.Indeterminate ||
+            poolFilterActive(filterState))),
     );
 
   for (const participant of participants) {
@@ -69,10 +121,11 @@ function applyFilters(participants: Participant[]) {
             !!participant.paidStatuses[optionId],
           ) &&
           (!eventOptionIds.has(optionId) ||
-            matchesNullableBoolean(
+            (matchesNullableBoolean(
               filterState.added,
               !!participant.registeredStatuses[optionId],
-            )),
+            ) &&
+              matchesPoolFilter(filterState, participant, optionId))),
       );
   }
 }
@@ -194,18 +247,9 @@ async function fetchUnofficialGql(
 }
 
 const GQL_GET_EVENTS = `
-query TournamentEvents(
-  $tournamentSlug: String
-  $page: Int = 1
-  $perPage: Int = 100
-  $sortBy: String = "id DESC"
-) {
+query TournamentEvents($tournamentSlug: String) {
   currentUser {
     id
-  }
-  tournament(slug: $tournamentSlug) {
-    name
-    slug
   }
   tournamentRegistrationInfo: tournament(slug: $tournamentSlug) {
     events {
@@ -231,7 +275,7 @@ const GQL_GET_PARTICIPANTS = `
 query TournamentParticipants(
   $tournamentSlug: String
   $page: Int = 1
-  $perPage: Int = 100
+  $perPage: Int = ${PARTICIPANT_PER_PAGE}
   $sortBy: String = "id DESC"
 ) {
   currentUser {
@@ -249,6 +293,9 @@ query TournamentParticipants(
         id
         prefix
         gamerTag
+        entrants {
+          id
+        }
         registrationSelections{
           regValue {
             id
@@ -257,6 +304,62 @@ query TournamentParticipants(
             optionTypeId
           }
           balance
+        }
+      }
+    }
+  }
+}
+`;
+
+const GQL_GET_POOLS = `
+query TournamentPools(
+  $tournamentSlug: String
+  $groupPage: Int = 1
+  $groupPerPage: Int = ${GROUP_PER_PAGE}
+  $seedPage: Int = 1
+  $seedPerPage: Int = ${SEED_PER_PAGE}
+  $seedSortBy: String = "id DESC"
+) {
+  currentUser {
+    id
+  }
+  tournament(slug: $tournamentSlug) {
+    name
+    slug
+    events {
+      id
+      paginatedPhaseGroups(query: {
+        page: $groupPage,
+        perPage: $groupPerPage
+      }) {
+        pageInfo {
+          page
+          totalPages
+        }
+        nodes {
+          id
+          displayIdentifier
+          phase {
+            id
+            name
+            phaseOrder
+          }
+          seeds(query: {
+            page: $seedPage,
+            perPage: $seedPerPage,
+            sortBy: $seedSortBy
+          }) {
+            pageInfo {
+              page
+              totalPages
+            }
+            nodes {
+              id
+              entrant {
+                id
+              }
+            }
+          }
         }
       }
     }
@@ -297,6 +400,9 @@ export function ingestEvents(
           options: rawRegistrationOption['values'].map(
             (value: Record<string, string>) => value['name'],
           ),
+          ...(rawRegistrationOption['optionType'] == 'event'
+            ? { pools: [] }
+            : {}),
         })
       : {};
   }
@@ -305,6 +411,7 @@ export function ingestEvents(
 export function ingestParticipants(
   queryResponse: { [x: string]: any },
   participants: Participant[],
+  participantsByEntrant: Map<Id, Participant[]> = new Map(),
 ) {
   for (let rawParticipantNode of queryResponse['tournamentRegistrationInfo'][
     'participants'
@@ -312,12 +419,24 @@ export function ingestParticipants(
     const participant: Participant = {
       id: rawParticipantNode['id'],
       displayName: rawParticipantNode['gamerTag'],
-      prefix: rawParticipantNode['prefix'],
+      prefix: rawParticipantNode['prefix'] ?? '',
       filtered: false,
       paidStatuses: {},
       registeredStatuses: {},
+      pools: {},
     };
     participants.push(participant);
+
+    // A doubles entrant maps to several participants, so this is many-to-many.
+    for (let rawEntrant of rawParticipantNode['entrants'] ?? []) {
+      const entrantId = Number(rawEntrant['id']);
+      const existing = participantsByEntrant.get(entrantId);
+      if (existing) {
+        existing.push(participant);
+      } else {
+        participantsByEntrant.set(entrantId, [participant]);
+      }
+    }
 
     for (let registrationSelection of rawParticipantNode[
       'registrationSelections'
@@ -338,20 +457,125 @@ export function ingestParticipants(
   }
 }
 
+type CollectedPool = Pool & {
+  phaseOrder: number;
+  entrantIds: Set<Id>;
+};
+
+export function ingestPools(
+  queryResponse: { [x: string]: any },
+  poolsByEvent: Map<Id, Map<Id, CollectedPool>>,
+) {
+  for (let rawEvent of queryResponse['tournament']['events'] ?? []) {
+    const eventId = Number(rawEvent['id']);
+
+    for (let rawGroup of rawEvent['paginatedPhaseGroups']['nodes']) {
+      const poolId = Number(rawGroup['id']);
+      if (!Number.isFinite(poolId) || poolId < 0) {
+        // less than zero means its our "UNSEEDED" pseudo-pool
+        throw new Error(
+          `start.gg returned an unusable phase group id: ${rawGroup['id']}`,
+        );
+      }
+
+      let eventPools = poolsByEvent.get(eventId);
+      if (eventPools == undefined) {
+        eventPools = new Map();
+        poolsByEvent.set(eventId, eventPools);
+      }
+
+      let pool = eventPools.get(poolId);
+      if (pool == undefined) {
+        pool = {
+          id: poolId,
+          phase: rawGroup['phase']?.['name'] ?? '',
+          name: rawGroup['displayIdentifier'] ?? '',
+          phaseOrder: rawGroup['phase']?.['phaseOrder'] ?? 0,
+          entrantIds: new Set(),
+        };
+        eventPools.set(poolId, pool);
+      }
+
+      for (let rawSeed of rawGroup['seeds']?.['nodes'] ?? []) {
+        const entrantId = Number(rawSeed['entrant']?.['id']);
+        if (Number.isFinite(entrantId)) {
+          pool.entrantIds.add(entrantId);
+        }
+      }
+    }
+  }
+}
+
+export function resolvePools(
+  poolsByEvent: Map<Id, Map<Id, CollectedPool>>,
+  participantsByEntrant: Map<Id, Participant[]>,
+  registrationOptions: RegistrationOption[],
+) {
+  for (let registrationOption of registrationOptions) {
+    if (registrationOption.type != 'event') {
+      continue;
+    }
+
+    const collected = [
+      ...(poolsByEvent.get(registrationOption.id)?.values() ?? []),
+    ];
+    const firstPhaseOrder = collected.reduce(
+      (lowest, pool) => Math.min(lowest, pool.phaseOrder),
+      Infinity,
+    );
+    const firstPhasePools = collected
+      .filter(
+        (pool) =>
+          pool.phaseOrder === firstPhaseOrder && pool.entrantIds.size > 0,
+      )
+      .sort((a, b) => a.id - b.id);
+
+    if (firstPhasePools.length === 0) {
+      registrationOption.pools = [];
+      continue;
+    }
+
+    const pools = firstPhasePools.map((collectedPool) => {
+      const pool: Pool = {
+        id: collectedPool.id,
+        phase: collectedPool.phase,
+        name: collectedPool.name,
+      };
+      for (let entrantId of collectedPool.entrantIds) {
+        for (let participant of participantsByEntrant.get(entrantId) ?? []) {
+          participant.pools[registrationOption.id] = pool;
+        }
+      }
+      return pool;
+    });
+
+    registrationOption.pools = [...pools, UNSEEDED_POOL];
+  }
+}
+
+function maxTotalPages(pageInfos: { [x: string]: any }[]) {
+  return pageInfos.reduce(
+    (most, pageInfo) => Math.max(most, pageInfo?.['totalPages'] ?? 0),
+    0,
+  );
+}
+
 export async function getRegistration(cookies: Cookie[], slugOrShort: string) {
   let participants: Participant[] = [];
   let registrationOptions: RegistrationOption[] = [];
+  const participantsByEntrant = new Map<Id, Participant[]>();
+  const throttle = makeRequestThrottle();
 
+  await throttle();
   let eventsQuery = await fetchUnofficialGql(cookies, GQL_GET_EVENTS, {
     tournamentSlug: slugOrShort,
   });
   if (eventsQuery == undefined) {
     return undefined;
   }
-  const name = eventsQuery['tournament']['name'];
-  const slug = eventsQuery['tournament']['slug'];
   ingestEvents(eventsQuery, registrationOptions);
 
+  await throttle();
   let participantsQuery = await fetchUnofficialGql(
     cookies,
     GQL_GET_PARTICIPANTS,
@@ -362,31 +586,104 @@ export async function getRegistration(cookies: Cookie[], slugOrShort: string) {
   if (participantsQuery == undefined) {
     return undefined;
   }
-  ingestParticipants(participantsQuery, participants);
+  ingestParticipants(participantsQuery, participants, participantsByEntrant);
+
+  let participantPage = 1;
   while (
     participantsQuery['tournamentRegistrationInfo']['participants']['pageInfo'][
       'totalPages'
-    ] >
-    participantsQuery['tournamentRegistrationInfo']['participants']['pageInfo'][
-      'page'
-    ]
+    ] > participantPage
   ) {
+    participantPage += 1;
+    if (participantPage > MAX_PARTICIPANT_PAGES) {
+      throw new Error(
+        `start.gg reported more than ${MAX_PARTICIPANT_PAGES} pages of participants - refusing to keep paging.`,
+      );
+    }
+
+    await throttle();
     participantsQuery = await fetchUnofficialGql(
       cookies,
       GQL_GET_PARTICIPANTS,
       {
         tournamentSlug: slugOrShort,
-        page:
-          participantsQuery['tournamentRegistrationInfo']['participants'][
-            'pageInfo'
-          ]['page'] + 1,
+        page: participantPage,
       },
     );
     if (participantsQuery == undefined) {
       return undefined;
     }
-    ingestParticipants(participantsQuery, participants);
+    ingestParticipants(participantsQuery, participants, participantsByEntrant);
   }
+
+  const poolsByEvent = new Map<Id, Map<Id, CollectedPool>>();
+  let name = '';
+  let slug = '';
+  let groupPage = 1;
+  let sweeping = true;
+  while (sweeping) {
+    let seedPage = 1;
+    let maxGroupPages = 1;
+    for (;;) {
+      await throttle();
+      const poolsQuery = await fetchUnofficialGql(cookies, GQL_GET_POOLS, {
+        tournamentSlug: slugOrShort,
+        groupPage: groupPage,
+        seedPage: seedPage,
+      });
+      if (poolsQuery == undefined) {
+        return undefined;
+      }
+
+      const rawTournament = poolsQuery['tournament'];
+      if (rawTournament == undefined) {
+        throw new Error(`No tournament found for slug: ${slugOrShort}`);
+      }
+      name = rawTournament['name'] ?? '';
+      slug = rawTournament['slug'] ?? '';
+      ingestPools(poolsQuery, poolsByEvent);
+
+      const rawEvents = rawTournament['events'] ?? [];
+      const rawGroups = rawEvents.flatMap(
+        (rawEvent: { [x: string]: any }) =>
+          rawEvent['paginatedPhaseGroups']['nodes'],
+      );
+      maxGroupPages = maxTotalPages(
+        rawEvents.map(
+          (rawEvent: { [x: string]: any }) =>
+            rawEvent['paginatedPhaseGroups']['pageInfo'],
+        ),
+      );
+      const maxSeedPages = maxTotalPages(
+        rawGroups.map(
+          (rawGroup: { [x: string]: any }) => rawGroup['seeds']?.['pageInfo'],
+        ),
+      );
+
+      if (seedPage >= maxSeedPages) {
+        break;
+      }
+      seedPage += 1;
+      if (seedPage > MAX_POOL_PAGES) {
+        throw new Error(
+          `start.gg reported more than ${MAX_POOL_PAGES} pages of seeds - refusing to keep paging.`,
+        );
+      }
+    }
+
+    if (groupPage >= maxGroupPages) {
+      sweeping = false;
+    } else {
+      groupPage += 1;
+      if (groupPage > MAX_POOL_PAGES) {
+        throw new Error(
+          `start.gg reported more than ${MAX_POOL_PAGES} pages of phase groups - refusing to keep paging.`,
+        );
+      }
+    }
+  }
+
+  resolvePools(poolsByEvent, participantsByEntrant, registrationOptions);
 
   return {
     name: name,

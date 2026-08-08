@@ -13,9 +13,6 @@ import StartggCheckin from './StartggCheckin';
 import { WindowEvent } from './setWindowEventListener';
 import ErrorDialog from './ErrorDialog';
 
-// TODO: set window title after pulling tournament
-// TODO: pull pools from startgg!
-// TODO: pull DQ status from startgg!
 // TODO: pull user discriminators from startgg ?
 // TODO: improve copy dialog...
 // TODO: set up testing
@@ -159,12 +156,13 @@ function IndexPage() {
     setFilterState(
       Object.fromEntries(
         startggTournament.registrationOptions.map(
-          ({ id, type }): [Id, FilterState] => [
+          ({ id, pools }): [Id, FilterState] => [
             id,
             {
               ...DEFAULT_FILTER_STATE,
-              // TODO: real pool names once they're pulled from start.gg
-              pools: type == 'event' ? { 'Pool 1': true, 'Pool 2': true } : {},
+              pools: Object.fromEntries(
+                (pools ?? []).map((pool) => [pool.id, true]),
+              ),
             },
           ],
         ),
@@ -177,6 +175,31 @@ function IndexPage() {
     setSearchText('');
     resetFilters();
   }, [registrationOptionsKey]);
+
+  const poolsKey = startggTournament.registrationOptions
+    .map(
+      ({ id, pools }) =>
+        `${id}:${(pools ?? []).map((pool) => pool.id).join('.')}`,
+    )
+    .join(',');
+  useEffect(() => {
+    setFilterState((prev) => {
+      const next: Record<Id, FilterState> = { ...prev };
+      startggTournament.registrationOptions.forEach(({ id, pools }) => {
+        const current = prev[id] ?? DEFAULT_FILTER_STATE;
+        next[id] = {
+          ...current,
+          pools: Object.fromEntries(
+            (pools ?? []).map((pool) => [
+              pool.id,
+              current.pools[pool.id] ?? true,
+            ]),
+          ),
+        };
+      });
+      return next;
+    });
+  }, [poolsKey]);
 
   useEffect(() => {
     window.electron.updateParticipantsFiltered(searchText, filterState);

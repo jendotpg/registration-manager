@@ -9,7 +9,13 @@ import {
   Stack,
 } from '@mui/material';
 import { ExpandLess, ExpandMore } from '@mui/icons-material';
-import { nextNullableBoolean, NullableBoolean } from '../common/types';
+import {
+  Id,
+  nextNullableBoolean,
+  NullableBoolean,
+  Pool,
+  poolLabel,
+} from '../common/types';
 
 function CyclingCheckbox({
   label,
@@ -66,8 +72,7 @@ export function AddedMenu({
   onClose,
   addedState,
   onAddedChange,
-  dqdState,
-  onDqdChange,
+  poolOptions,
   pools,
   onPoolsChange,
 }: {
@@ -76,17 +81,15 @@ export function AddedMenu({
   onClose: () => void;
   addedState: NullableBoolean;
   onAddedChange: (next: NullableBoolean) => void;
-  dqdState: NullableBoolean;
-  onDqdChange: (next: NullableBoolean) => void;
-  pools: Record<string, boolean>;
-  onPoolsChange: (pools: Record<string, boolean>) => void;
+  poolOptions: Pool[];
+  pools: Record<Id, boolean>;
+  onPoolsChange: (pools: Record<Id, boolean>) => void;
 }) {
   const [poolsExpanded, setPoolsExpanded] = useState(true);
 
-  const poolNames = Object.keys(pools);
-  const checkedPoolCount = poolNames.filter((name) => pools[name]).length;
+  const checkedPoolCount = poolOptions.filter((pool) => pools[pool.id]).length;
   const allPoolsChecked =
-    poolNames.length > 0 && checkedPoolCount === poolNames.length;
+    poolOptions.length > 0 && checkedPoolCount === poolOptions.length;
   const somePoolsChecked = checkedPoolCount > 0 && !allPoolsChecked;
 
   return (
@@ -99,9 +102,6 @@ export function AddedMenu({
         />
       </MenuItem>
       <MenuItem disableRipple>
-        <CyclingCheckbox label="DQ'd" state={dqdState} onChange={onDqdChange} />
-      </MenuItem>
-      <MenuItem disableRipple>
         <Stack direction="row" alignItems="center" sx={{ width: '100%' }}>
           <FormControlLabel
             sx={{ flexGrow: 1 }}
@@ -111,9 +111,9 @@ export function AddedMenu({
                 indeterminate={somePoolsChecked}
                 onChange={() => {
                   const selectAll = !allPoolsChecked;
-                  const next: Record<string, boolean> = {};
-                  poolNames.forEach((name) => {
-                    next[name] = selectAll;
+                  const next: Record<Id, boolean> = {};
+                  poolOptions.forEach((pool) => {
+                    next[pool.id] = selectAll;
                   });
                   onPoolsChange(next);
                 }}
@@ -132,19 +132,19 @@ export function AddedMenu({
           </IconButton>
         </Stack>
       </MenuItem>
-      <Collapse in={poolsExpanded}>
-        {poolNames.map((name) => (
-          <MenuItem key={name} disableRipple sx={{ paddingLeft: '32px' }}>
+      <Collapse in={poolsExpanded} sx={{ maxHeight: 240, overflowY: 'auto' }}>
+        {poolOptions.map((pool) => (
+          <MenuItem key={pool.id} disableRipple sx={{ paddingLeft: '32px' }}>
             <FormControlLabel
               control={
                 <Checkbox
-                  checked={pools[name]}
+                  checked={!!pools[pool.id]}
                   onChange={() =>
-                    onPoolsChange({ ...pools, [name]: !pools[name] })
+                    onPoolsChange({ ...pools, [pool.id]: !pools[pool.id] })
                   }
                 />
               }
-              label={name}
+              label={poolLabel(pool)}
             />
           </MenuItem>
         ))}

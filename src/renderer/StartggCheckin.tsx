@@ -456,8 +456,7 @@ export default function StartggCheckin({
                               onAddedChange={(added) =>
                                 updateFilter(id, { added })
                               }
-                              dqdState={filter.dqd}
-                              onDqdChange={(dqd) => updateFilter(id, { dqd })}
+                              poolOptions={registrationOption.pools ?? []}
                               pools={filter.pools}
                               onPoolsChange={(pools) =>
                                 updateFilter(id, { pools })
