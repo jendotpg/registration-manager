@@ -211,7 +211,8 @@
       "provider": "github",
       "owner": "jendotpg",
       "repo": "registration-manager",
-      "releaseType": "draft"
+      "releaseType": "draft",
+      "publishAutoUpdate": false
     },
     "files": [
       "dist",
@@ -239,6 +240,7 @@
       "identity": null
     },
     "dmg": {
+      "writeUpdateInfo": false,
       "contents": [
         {
           "x": 130,

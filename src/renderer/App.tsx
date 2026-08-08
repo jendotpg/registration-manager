@@ -13,8 +13,6 @@ import StartggCheckin from './StartggCheckin';
 import ErrorDialog from './ErrorDialog';
 import CopyDialog from './CopyDialog';
 
-// TODO: fix building!! we're hardcoding the fucking python path LMFAOOO. i also cant build x86 windows binaries. use github actions?
-
 // TODO: performance fixes - the whole interface slows down a LOT with big events...
 // // debounce searchText inputs
 // // put checkboxes in react-window List to only render visible ones
