@@ -55,7 +55,8 @@ jest.mock('electron-store', () =>
 );
 
 jest.mock('../main/loginwindow', () => ({
-  openStartggLoginWindow: jest.fn(),
+  __esModule: true,
+  default: jest.fn(),
 }));
 
 jest.mock('../main/startgg', () => ({
@@ -74,7 +75,7 @@ import { clipboard, session } from 'electron';
 // eslint-disable-next-line import/first
 import setupIPCs from '../main/ipc';
 // eslint-disable-next-line import/first
-import { openStartggLoginWindow } from '../main/loginwindow';
+import openStartggLoginWindow from '../main/loginwindow';
 // eslint-disable-next-line import/first
 import {
   getTournament,

@@ -13,6 +13,32 @@ module.exports = {
     '@typescript-eslint/no-shadow': 'error',
     'no-unused-vars': 'off',
     '@typescript-eslint/no-unused-vars': 'error',
+    // airbnb bans for..of to avoid pulling in regenerator-runtime. This is
+    // TypeScript on modern V8, where for..of compiles to a plain loop, and the
+    // ingest functions in startgg.ts read far better as loops than as chained
+    // array methods. The other three selectors are airbnb's defaults, kept.
+    'no-restricted-syntax': [
+      'error',
+      {
+        selector: 'ForInStatement',
+        message:
+          'for..in loops iterate over the entire prototype chain, which is virtually never what you want. Use Object.{keys,values,entries}, and iterate over the resulting array.',
+      },
+      {
+        selector: 'LabeledStatement',
+        message:
+          'Labels are a form of GOTO; using them makes code confusing and hard to maintain and understand.',
+      },
+      {
+        selector: 'WithStatement',
+        message:
+          '`with` is disallowed in strict mode because it makes code impossible to predict and optimize.',
+      },
+    ],
+    // getRegistration pages the start.gg API sequentially on purpose, so the
+    // throttle from makeRequestThrottle() can space the requests out. Awaiting
+    // in the loop is the point; parallelising would defeat it.
+    'no-await-in-loop': 'off',
   },
   overrides: [
     {
@@ -47,5 +73,8 @@ module.exports = {
     RequestInfo: true,
     RequestInit: true,
     NodeJS: true,
+    // Electron's ambient TS namespace (Electron.Cookie,
+    // Electron.MenuItemConstructorOptions) is a type-only global.
+    Electron: true,
   },
 };

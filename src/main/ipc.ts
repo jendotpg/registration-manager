@@ -10,7 +10,7 @@ import {
   updateParticipantsFiltered,
   getVisibleParticipantsText,
 } from './startgg';
-import { openStartggLoginWindow } from './loginwindow';
+import openStartggLoginWindow from './loginwindow';
 import { FilterState, Id } from '../common/types';
 
 const isDebug = () =>
@@ -26,6 +26,7 @@ export default function setupIPCs(mainWindow: BrowserWindow): void {
     : [];
 
   if (isDebug()) {
+    // eslint-disable-next-line no-console
     console.log(
       startggCookies
         ?.map((cookie) => `${cookie.name}=${cookie.value}`)
@@ -34,7 +35,7 @@ export default function setupIPCs(mainWindow: BrowserWindow): void {
   }
 
   ipcMain.removeHandler('logOut');
-  ipcMain.handle('logOut', (event) => {
+  ipcMain.handle('logOut', () => {
     session.defaultSession.clearStorageData({
       storages: ['cookies'],
     });
@@ -60,7 +61,7 @@ export default function setupIPCs(mainWindow: BrowserWindow): void {
   });
 
   ipcMain.removeHandler('openStartggLoginWindow');
-  ipcMain.handle('openStartggLoginWindow', (event) => {
+  ipcMain.handle('openStartggLoginWindow', () => {
     openStartggLoginWindow((cookies) => {
       store.set('startggCookies', cookies);
       startggCookies = cookies;
@@ -78,7 +79,7 @@ export default function setupIPCs(mainWindow: BrowserWindow): void {
 
     const tournament = await getTournament(startggCookies, slugOrShort);
 
-    if (tournament == undefined) {
+    if (tournament == null) {
       mainWindow.webContents.send('loggedInStatus', {
         loggedInStatus: false,
       });
@@ -100,7 +101,7 @@ export default function setupIPCs(mainWindow: BrowserWindow): void {
   ipcMain.handle('getAdminedTournaments', async () => {
     return getAdminedTournaments(startggCookies).then(
       async (adminedTournaments) => {
-        if (adminedTournaments == undefined) {
+        if (adminedTournaments == null) {
           mainWindow.webContents.send('loggedInStatus', {
             loggedInStatus: false,
           });
@@ -112,6 +113,7 @@ export default function setupIPCs(mainWindow: BrowserWindow): void {
         mainWindow.webContents.send('adminedTournaments', {
           adminedTournaments,
         });
+        return undefined;
       },
     );
   });

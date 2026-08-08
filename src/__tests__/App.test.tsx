@@ -530,7 +530,6 @@ describe('hotkeys', () => {
       'tournament/nyc-melee-100',
     );
   });
-
 });
 
 describe('copying the listed participants', () => {

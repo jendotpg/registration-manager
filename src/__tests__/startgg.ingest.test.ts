@@ -376,6 +376,21 @@ describe('ingestParticipants', () => {
     expect(participants[0].paidStatuses[SINGLES]).toBe(true);
   });
 
+  it('does not treat an unparsable balance as paid', () => {
+    const { participants } = ingest([
+      node({
+        registrationSelections: [
+          {
+            regValue: { id: 1110, optionType: 'event', optionTypeId: SINGLES },
+            balance: 'zero',
+          },
+        ],
+      }),
+    ]);
+
+    expect(participants[0].paidStatuses[SINGLES]).toBe(false);
+  });
+
   it('accumulates across pages instead of replacing', () => {
     const { ingestParticipants } = loadStartgg();
     const participants: Participant[] = [];

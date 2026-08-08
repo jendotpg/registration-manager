@@ -1,10 +1,9 @@
-import os from 'os';
 import { URL } from 'url';
 import path from 'path';
-import { execSync } from 'child_process';
-import { LookupOptions } from 'dns';
-import { IPv4, IPv6, parse } from 'ipaddr.js';
 import { app } from 'electron';
+
+export const isDebug = () =>
+  process.env.NODE_ENV === 'development' || process.env.DEBUG_PROD === 'true';
 
 export const RESOURCES_PATH = app.isPackaged
   ? path.join(process.resourcesPath, 'assets')

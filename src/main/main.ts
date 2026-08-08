@@ -70,7 +70,7 @@ const installExtensions = async () => {
     .catch(console.log);
 };
 
-const createMenu = (mainWindow: BrowserWindow): void => {
+const createMenu = (targetWindow: BrowserWindow): void => {
   if (process.platform !== 'darwin') {
     Menu.setApplicationMenu(null);
     return;
@@ -105,7 +105,7 @@ const createMenu = (mainWindow: BrowserWindow): void => {
         {
           label: 'Reload',
           click: async () => {
-            mainWindow.webContents.send('refreshTournament');
+            targetWindow.webContents.send('refreshTournament');
           },
         },
         { type: 'separator' },

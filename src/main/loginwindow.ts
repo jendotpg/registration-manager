@@ -1,9 +1,9 @@
-import { app, session, BrowserWindow } from 'electron';
-import { getAssetPath } from './util';
+import { BrowserWindow } from 'electron';
+import { getAssetPath, isDebug } from './util';
 
 let loginWindow: BrowserWindow | null = null;
 
-export function openStartggLoginWindow(
+export default function openStartggLoginWindow(
   setStartggCookies: (cookies: Electron.Cookie[]) => void,
   mainWindow: BrowserWindow,
 ) {
@@ -26,18 +26,21 @@ export function openStartggLoginWindow(
           url: 'https://www.start.gg/',
         },
       );
-      if (startggCookies != undefined) {
+      if (startggCookies != null) {
         setStartggCookies(startggCookies);
 
         mainWindow.webContents.send('loggedInStatus', {
           loggedInStatus: true,
         });
 
-        console.log(
-          startggCookies
-            ?.map((cookie) => `${cookie.name}=${cookie.value}`)
-            .join('; '),
-        );
+        if (isDebug()) {
+          // eslint-disable-next-line no-console
+          console.log(
+            startggCookies
+              ?.map((cookie) => `${cookie.name}=${cookie.value}`)
+              .join('; '),
+          );
+        }
       }
       loginWindow?.close();
     }

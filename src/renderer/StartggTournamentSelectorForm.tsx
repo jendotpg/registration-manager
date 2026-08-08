@@ -3,7 +3,6 @@ import {
   CircularProgress,
   DialogContent,
   DialogContentText,
-  DialogTitle,
   IconButton,
   ListItemButton,
   ListItemText,
@@ -52,85 +51,79 @@ export default function StartggTournamentSelectorForm({
   };
 
   return (
-    <>
-      <DialogContent sx={{ pl: 2, pr: 2, pt: 2 }}>
-        <form
-          style={{
-            alignItems: 'center',
-            display: 'flex',
-            margin: '8px 24px',
-            gap: '8px',
-          }}
-          onSubmit={getTournamentOnSubmit}
+    <DialogContent sx={{ pl: 2, pr: 2, pt: 2 }}>
+      <form
+        style={{
+          alignItems: 'center',
+          display: 'flex',
+          margin: '8px 24px',
+          gap: '8px',
+        }}
+        onSubmit={getTournamentOnSubmit}
+      >
+        <TextField
+          label="Tournament Slug"
+          name="slug"
+          placeholder="super-smash-con-2023"
+          size="small"
+          variant="outlined"
+        />
+        <Button
+          disabled={gettingTournament}
+          endIcon={gettingTournament && <CircularProgress size="24px" />}
+          type="submit"
+          variant="contained"
         >
-          <TextField
-            label="Tournament Slug"
-            name="slug"
-            placeholder="super-smash-con-2023"
-            size="small"
-            variant="outlined"
-          />
-          <Button
-            disabled={gettingTournament}
-            endIcon={gettingTournament && <CircularProgress size="24px" />}
-            type="submit"
-            variant="contained"
-          >
-            Get!
-          </Button>
-          {gettingAdminedTournaments ? (
-            <CircularProgress size="24px" style={{ padding: '8px' }} />
-          ) : (
-            <Tooltip arrow title="Get tournaments">
-              <IconButton
-                style={{
-                  marginLeft: 'auto',
-                }}
-                onClick={async () => {
-                  setGettingAdminedTournaments(true);
-                  try {
-                    await window.electron.getAdminedTournaments();
-                  } catch (e: any) {
-                    showErrorDialog([e instanceof Error ? e.message : e]);
-                  } finally {
-                    setGettingAdminedTournaments(false);
-                  }
-                }}
-              >
-                <Refresh />
-              </IconButton>
-            </Tooltip>
-          )}
-        </form>
-        {gettingAdminedTournaments && adminedTournaments.length === 0 ? (
-          <Stack direction="row" margin="8px 24px" spacing="8px">
-            <CircularProgress size="24px" />
-            <DialogContentText>
-              Getting admined tournaments...
-            </DialogContentText>
-          </Stack>
+          Get!
+        </Button>
+        {gettingAdminedTournaments ? (
+          <CircularProgress size="24px" style={{ padding: '8px' }} />
         ) : (
-          adminedTournaments.map((adminedTournament) => (
-            <ListItemButton
-              key={adminedTournament.slug}
-              style={{ paddingLeft: '24px', paddingRight: '24px' }}
+          <Tooltip arrow title="Get tournaments">
+            <IconButton
+              style={{
+                marginLeft: 'auto',
+              }}
               onClick={async () => {
-                await getTournament(adminedTournament.slug);
-                close();
+                setGettingAdminedTournaments(true);
+                try {
+                  await window.electron.getAdminedTournaments();
+                } catch (e: any) {
+                  showErrorDialog([e instanceof Error ? e.message : e]);
+                } finally {
+                  setGettingAdminedTournaments(false);
+                }
               }}
             >
-              <ListItemText
-                style={{ overflowX: 'hidden', whiteSpace: 'nowrap' }}
-              >
-                {adminedTournament.name}{' '}
-                <Typography variant="caption">
-                  ({adminedTournament.slug})
-                </Typography>
-              </ListItemText>
-            </ListItemButton>
-          ))
+              <Refresh />
+            </IconButton>
+          </Tooltip>
         )}
-      </DialogContent>
-    </>
+      </form>
+      {gettingAdminedTournaments && adminedTournaments.length === 0 ? (
+        <Stack direction="row" margin="8px 24px" spacing="8px">
+          <CircularProgress size="24px" />
+          <DialogContentText>Getting admined tournaments...</DialogContentText>
+        </Stack>
+      ) : (
+        adminedTournaments.map((adminedTournament) => (
+          <ListItemButton
+            key={adminedTournament.slug}
+            style={{ paddingLeft: '24px', paddingRight: '24px' }}
+            onClick={async () => {
+              await getTournament(adminedTournament.slug);
+              close();
+            }}
+          >
+            <ListItemText style={{ overflowX: 'hidden', whiteSpace: 'nowrap' }}>
+              {adminedTournament.name}{' '}
+              <Typography variant="caption">
+                ({adminedTournament.slug})
+              </Typography>
+            </ListItemText>
+          </ListItemButton>
+        ))
+      )}
+    </DialogContent>
   );
 }

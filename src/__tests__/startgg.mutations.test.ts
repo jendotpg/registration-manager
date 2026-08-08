@@ -473,9 +473,7 @@ describe('updateParticipantRegistration', () => {
       startgg.updateParticipantRegistration(COOKIES, 5, SINGLES),
     ).rejects.toThrow('Nope');
 
-    expect(
-      participantIn(startgg, 5).registeredStatuses[SINGLES],
-    ).toBeFalsy();
+    expect(participantIn(startgg, 5).registeredStatuses[SINGLES]).toBeFalsy();
   });
 
   it('leaves the model alone when the failed write followed no toggle', async () => {

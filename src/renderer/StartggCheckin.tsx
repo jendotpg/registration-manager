@@ -70,14 +70,14 @@ export function disabledReason(
   ) {
     return 'Updating…';
   }
-  if (kind == 'added') {
+  if (kind === 'added') {
     return registrationOption.started ? EVENT_STARTED_REASON : '';
   }
   if (registrationOption.free) {
     return FREE_REASON;
   }
   if (
-    registrationOption.type == 'event' &&
+    registrationOption.type === 'event' &&
     registrationOption.started &&
     !tournamentParticipant.registeredStatuses[registrationOption.id]
   ) {
@@ -190,7 +190,7 @@ export default function StartggCheckin({
     const labelWidth =
       Math.ceil(measuredLabelWidths[registrationOption.id] ?? 0) +
       LABEL_WIDTH_PAD_PX;
-    return registrationOption.type == 'event'
+    return registrationOption.type === 'event'
       ? Math.max(EVENT_COL_MIN_PX, labelWidth)
       : Math.min(VENUE_COL_MAX_PX, Math.max(VENUE_COL_MIN_PX, labelWidth));
   };
@@ -230,7 +230,7 @@ export default function StartggCheckin({
   );
   const tableMinWidth = `${Math.ceil(restPx + nameColPx)}px`;
 
-  return startggTournament.slug == '' ? (
+  return startggTournament.slug === '' ? (
     <Stack
       direction="row"
       alignItems="center"
@@ -388,7 +388,7 @@ export default function StartggCheckin({
               {startggTournament.registrationOptions.map(
                 (registrationOption) => {
                   const { id } = registrationOption;
-                  const isEvent = registrationOption.type == 'event';
+                  const isEvent = registrationOption.type === 'event';
                   const filter = filterFor(id);
                   return (
                     <Stack
@@ -555,7 +555,7 @@ export default function StartggCheckin({
                               registrationOption,
                               'added',
                             );
-                            return registrationOption.type == 'tournament' ? (
+                            return registrationOption.type === 'tournament' ? (
                               <Stack
                                 key={`${registrationOption.id}-checkboxes`}
                                 alignItems="center"
@@ -572,7 +572,7 @@ export default function StartggCheckin({
                                 >
                                   <span>
                                     <Checkbox
-                                      disabled={paidReason != ''}
+                                      disabled={paidReason !== ''}
                                       checked={
                                         !!tournamentParticipant.paidStatuses[
                                           registrationOption.id
@@ -613,7 +613,7 @@ export default function StartggCheckin({
                                 >
                                   <span>
                                     <Checkbox
-                                      disabled={paidReason != ''}
+                                      disabled={paidReason !== ''}
                                       size="small"
                                       checked={
                                         !!tournamentParticipant.paidStatuses[
@@ -641,7 +641,7 @@ export default function StartggCheckin({
                                 >
                                   <span>
                                     <Checkbox
-                                      disabled={addedReason != ''}
+                                      disabled={addedReason !== ''}
                                       size="small"
                                       checked={
                                         !!tournamentParticipant

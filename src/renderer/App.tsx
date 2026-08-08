@@ -13,10 +13,6 @@ import StartggCheckin from './StartggCheckin';
 import ErrorDialog from './ErrorDialog';
 import CopyDialog from './CopyDialog';
 
-// TODO: set up testing
-
-// TODO: fix linter issues
-
 // TODO: performance fixes - the whole interface slows down a LOT with big events...
 // // debounce searchText inputs
 // // put checkboxes in react-window List to only render visible ones
@@ -67,7 +63,7 @@ function IndexPage() {
   useEffect(() => {
     window.electron.onLoggedInStatus(
       (e, { loggedInStatus: newLoggedInStatus }) => {
-        if (loggedInStatusRef.current != newLoggedInStatus) {
+        if (loggedInStatusRef.current !== newLoggedInStatus) {
           setGettingAdminedTournaments(true);
           setLoggedInStatus(newLoggedInStatus);
           if (newLoggedInStatus) {
@@ -75,9 +71,12 @@ function IndexPage() {
               .getAdminedTournaments()
               .then(() => {
                 setGettingAdminedTournaments(false);
+                return undefined;
               })
-              .catch((e) => {
-                showErrorDialog([e instanceof Error ? e.message : e]);
+              .catch((error) => {
+                showErrorDialog([
+                  error instanceof Error ? error.message : error,
+                ]);
                 setGettingAdminedTournaments(false);
               });
           } else {
@@ -89,17 +88,19 @@ function IndexPage() {
   }, []);
 
   useEffect(() => {
-    window.electron.onAdminedTournaments((e, { adminedTournaments }) => {
-      if (adminedTournaments != undefined) {
-        setAdminedTournaments(adminedTournaments);
-        setGettingAdminedTournaments(false);
-      }
-    });
+    window.electron.onAdminedTournaments(
+      (e, { adminedTournaments: newAdminedTournaments }) => {
+        if (newAdminedTournaments != null) {
+          setAdminedTournaments(newAdminedTournaments);
+          setGettingAdminedTournaments(false);
+        }
+      },
+    );
   }, []);
 
   useEffect(() => {
     window.electron.onTournament((e, { startggTournament: newTournament }) => {
-      if (newTournament != undefined) {
+      if (newTournament != null) {
         setStartggTournament(newTournament);
       }
     });
@@ -111,6 +112,7 @@ function IndexPage() {
       .getAdminedTournaments()
       .then(() => {
         setGettingAdminedTournaments(false);
+        return undefined;
       })
       .catch((e) => {
         showErrorDialog([e instanceof Error ? e.message : e]);
@@ -123,7 +125,7 @@ function IndexPage() {
 
   const getStartggTournament = async (maybeSlug: string) => {
     if (!maybeSlug) {
-      return;
+      return undefined;
     }
 
     setGettingTournament(true);
@@ -141,6 +143,7 @@ function IndexPage() {
     window.electron.refreshTournament(() => {
       getStartggTournament(startggTournament.slug);
     });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [startggTournament]);
 
   const [searchText, setSearchText] = useState('');
@@ -177,6 +180,7 @@ function IndexPage() {
     setRegisteredMenuOpen({});
     setSearchText('');
     resetFilters();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [registrationOptionsKey]);
 
   const poolsKey = startggTournament.registrationOptions
@@ -202,6 +206,7 @@ function IndexPage() {
       });
       return next;
     });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [poolsKey]);
 
   useEffect(() => {
@@ -264,7 +269,6 @@ function IndexPage() {
         adminedTournaments={adminedTournaments}
         gettingAdminedTournaments={gettingAdminedTournaments}
         setSlugDialogOpen={setSlugDialogOpen}
-        setGettingTournament={setGettingTournament}
         setGettingAdminedTournaments={setGettingAdminedTournaments}
         showErrorDialog={showErrorDialog}
         getStartggTournament={getStartggTournament}
@@ -293,7 +297,7 @@ function IndexPage() {
 
 export default function App() {
   return (
-    <Router>
+    <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
       <Routes>
         <Route path="/" element={<IndexPage />} />
       </Routes>

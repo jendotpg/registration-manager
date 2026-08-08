@@ -29,6 +29,14 @@ const MIN_PAGINATION_DELAY_MS = 50;
 const MAX_PAGINATION_DELAY_MS = 300;
 const PAGINATION_DELAY_STEP_MS = 50;
 
+const isZeroAmount = (amount: unknown) => {
+  if (amount == null) {
+    return false;
+  }
+  const parsed = Number(amount);
+  return Number.isFinite(parsed) && parsed === 0;
+};
+
 const sleep = (ms: number) =>
   new Promise((resolve) => {
     setTimeout(resolve, ms);
@@ -75,7 +83,7 @@ function clearUpdatingCheckbox(
 ) {
   const key = checkboxKey(attendee, option);
   tournament.updatingCheckboxes = tournament.updatingCheckboxes.filter(
-    (updatingKey) => updatingKey != key,
+    (updatingKey) => updatingKey !== key,
   );
 }
 
@@ -104,19 +112,6 @@ function restoreStatus(
   }
 }
 
-function rollBackToggle(attendee: Id, option: Id) {
-  const key = checkboxKey(attendee, option);
-  const snapshot = pendingRollbacks.get(key);
-  const participant = getParticipant(attendee);
-  if (snapshot === undefined || participant === undefined) {
-    return;
-  }
-
-  restoreStatus(participant.paidStatuses, option, snapshot.paid);
-  restoreStatus(participant.registeredStatuses, option, snapshot.registered);
-  applyFilters([participant]);
-}
-
 function poolFilterActive(filterState: FilterState) {
   return Object.values(filterState.pools).some((checked) => !checked);
 }
@@ -138,8 +133,6 @@ function applyFilters(participants: Participant[]) {
     return;
   }
 
-  // The table renders a prefix as "TSM | Alice" but the haystack below joins it
-  // as "TSM|Alice", so someone typing what is on screen has to still match.
   const search = currentSearchText.toLowerCase().replace(/\s*\|\s*/g, '|');
 
   const eventOptionIds = new Set(
@@ -181,6 +174,19 @@ function applyFilters(participants: Participant[]) {
               matchesPoolFilter(filterState, participant, optionId))),
       );
   }
+}
+
+function rollBackToggle(attendee: Id, option: Id) {
+  const key = checkboxKey(attendee, option);
+  const snapshot = pendingRollbacks.get(key);
+  const participant = getParticipant(attendee);
+  if (snapshot === undefined || participant === undefined) {
+    return;
+  }
+
+  restoreStatus(participant.paidStatuses, option, snapshot.paid);
+  restoreStatus(participant.registeredStatuses, option, snapshot.registered);
+  applyFilters([participant]);
 }
 
 export function updateParticipantsFiltered(
@@ -244,37 +250,13 @@ async function wrappedFetch(
   return response;
 }
 
-export async function getTournament(cookies: Cookie[], slug: string) {
-  return getRegistration(cookies, slug).then((registration) => {
-    if (registration == undefined) {
-      return undefined;
-    }
-
-    const tournament = {
-      ...registration,
-      updatingCheckboxes: [],
-    };
-
-    if (currentTournament?.slug !== registration.slug) {
-      currentSearchText = '';
-      currentFilters = {};
-    }
-
-    pendingRollbacks.clear();
-
-    currentTournament = tournament;
-    applyFilters(currentTournament.participants);
-    return tournament;
-  });
-}
-
 async function fetchUnofficialGql(
   cookies: Cookie[],
   query: string,
   variables: any,
   type: GQL_TYPE = GQL_TYPE.QUERY,
 ) {
-  //note that this method expects every query to include
+  // note that this method expects every query to include
   //   currentUser {
   //      id
   //   }
@@ -298,7 +280,7 @@ async function fetchUnofficialGql(
     throw new Error(`${message}${retryMsg}`);
   }
 
-  if (type === GQL_TYPE.QUERY && json.data.currentUser?.id == undefined) {
+  if (type === GQL_TYPE.QUERY && json.data.currentUser?.id == null) {
     return undefined;
   }
 
@@ -431,37 +413,34 @@ export function ingestEvents(
 ) {
   const startedEvents = [];
 
-  for (let rawEvent of queryResponse['tournamentRegistrationInfo']['events']) {
-    if (rawEvent['state'] != 'CREATED' && rawEvent['state'] != 'READY') {
-      startedEvents.push(rawEvent['id']);
+  for (const rawEvent of queryResponse.tournamentRegistrationInfo.events) {
+    if (rawEvent.state !== 'CREATED' && rawEvent.state !== 'READY') {
+      startedEvents.push(rawEvent.id);
     }
   }
 
   registrationOptions.length = 0;
-  for (let rawRegistrationOption of queryResponse['tournamentRegistrationInfo'][
-    'registrationOptions'
-  ]) {
-    let id = undefined;
-    if (rawRegistrationOption['optionType'] == 'tournament') {
-      id = rawRegistrationOption['values'][0]['id'];
+  for (const rawRegistrationOption of queryResponse.tournamentRegistrationInfo
+    .registrationOptions) {
+    let id;
+    if (rawRegistrationOption.optionType === 'tournament') {
+      id = rawRegistrationOption.values[0].id;
       venueFeeOption = id;
-    } else if (rawRegistrationOption['optionType'] == 'event') {
-      id = rawRegistrationOption['values'][0]['optionTypeId'];
+    } else if (rawRegistrationOption.optionType === 'event') {
+      id = rawRegistrationOption.values[0].optionTypeId;
     }
 
     if (id !== undefined) {
       registrationOptions.push({
-        id: id,
-        name: rawRegistrationOption['name'],
-        type: rawRegistrationOption['optionType'],
+        id,
+        name: rawRegistrationOption.name,
+        type: rawRegistrationOption.optionType,
         started: startedEvents.includes(id),
-        free: rawRegistrationOption['values'][0]['fee'] == 0,
-        options: rawRegistrationOption['values'].map(
-          (value: Record<string, string>) => value['name'],
+        free: isZeroAmount(rawRegistrationOption.values[0].fee),
+        options: rawRegistrationOption.values.map(
+          (value: Record<string, string>) => value.name,
         ),
-        ...(rawRegistrationOption['optionType'] == 'event'
-          ? { pools: [] }
-          : {}),
+        ...(rawRegistrationOption.optionType === 'event' ? { pools: [] } : {}),
       });
     }
   }
@@ -472,13 +451,12 @@ export function ingestParticipants(
   participants: Participant[],
   participantsByEntrant: Map<Id, Participant[]> = new Map(),
 ) {
-  for (let rawParticipantNode of queryResponse['tournamentRegistrationInfo'][
-    'participants'
-  ]['nodes']) {
+  for (const rawParticipantNode of queryResponse.tournamentRegistrationInfo
+    .participants.nodes) {
     const participant: Participant = {
-      id: rawParticipantNode['id'],
-      displayName: rawParticipantNode['gamerTag'],
-      prefix: rawParticipantNode['prefix'] ?? '',
+      id: rawParticipantNode.id,
+      displayName: rawParticipantNode.gamerTag,
+      prefix: rawParticipantNode.prefix ?? '',
       filtered: false,
       paidStatuses: {},
       registeredStatuses: {},
@@ -487,8 +465,8 @@ export function ingestParticipants(
     participants.push(participant);
 
     // A doubles entrant maps to several participants, so this is many-to-many.
-    for (let rawEntrant of rawParticipantNode['entrants'] ?? []) {
-      const entrantId = Number(rawEntrant['id']);
+    for (const rawEntrant of rawParticipantNode.entrants ?? []) {
+      const entrantId = Number(rawEntrant.id);
       const existing = participantsByEntrant.get(entrantId);
       if (existing) {
         existing.push(participant);
@@ -497,20 +475,16 @@ export function ingestParticipants(
       }
     }
 
-    for (let registrationSelection of rawParticipantNode[
-      'registrationSelections'
-    ]) {
-      const balance = registrationSelection['balance'];
+    for (const registrationSelection of rawParticipantNode.registrationSelections) {
+      const { balance } = registrationSelection;
 
-      if (registrationSelection['regValue']['optionType'] == 'event') {
-        const eventId = registrationSelection['regValue']['optionTypeId'];
+      if (registrationSelection.regValue.optionType === 'event') {
+        const eventId = registrationSelection.regValue.optionTypeId;
         participant.registeredStatuses[eventId] = true;
-        participant.paidStatuses[eventId] = balance == 0;
-      } else if (
-        registrationSelection['regValue']['optionType'] == 'tournament'
-      ) {
-        const eventId = registrationSelection['regValue']['id'];
-        participant.paidStatuses[eventId] = balance == 0;
+        participant.paidStatuses[eventId] = isZeroAmount(balance);
+      } else if (registrationSelection.regValue.optionType === 'tournament') {
+        const eventId = registrationSelection.regValue.id;
+        participant.paidStatuses[eventId] = isZeroAmount(balance);
       }
     }
   }
@@ -525,38 +499,38 @@ export function ingestPools(
   queryResponse: { [x: string]: any },
   poolsByEvent: Map<Id, Map<Id, CollectedPool>>,
 ) {
-  for (let rawEvent of queryResponse['tournament']['events'] ?? []) {
-    const eventId = Number(rawEvent['id']);
+  for (const rawEvent of queryResponse.tournament.events ?? []) {
+    const eventId = Number(rawEvent.id);
 
-    for (let rawGroup of rawEvent['paginatedPhaseGroups']['nodes']) {
-      const poolId = Number(rawGroup['id']);
+    for (const rawGroup of rawEvent.paginatedPhaseGroups.nodes) {
+      const poolId = Number(rawGroup.id);
       if (!Number.isFinite(poolId) || poolId < 0) {
         // less than zero means its our "UNSEEDED" pseudo-pool
         throw new Error(
-          `start.gg returned an unusable phase group id: ${rawGroup['id']}`,
+          `start.gg returned an unusable phase group id: ${rawGroup.id}`,
         );
       }
 
       let eventPools = poolsByEvent.get(eventId);
-      if (eventPools == undefined) {
+      if (eventPools == null) {
         eventPools = new Map();
         poolsByEvent.set(eventId, eventPools);
       }
 
       let pool = eventPools.get(poolId);
-      if (pool == undefined) {
+      if (pool == null) {
         pool = {
           id: poolId,
-          phase: rawGroup['phase']?.['name'] ?? '',
-          name: rawGroup['displayIdentifier'] ?? '',
-          phaseOrder: rawGroup['phase']?.['phaseOrder'] ?? 0,
+          phase: rawGroup.phase?.name ?? '',
+          name: rawGroup.displayIdentifier ?? '',
+          phaseOrder: rawGroup.phase?.phaseOrder ?? 0,
           entrantIds: new Set(),
         };
         eventPools.set(poolId, pool);
       }
 
-      for (let rawSeed of rawGroup['seeds']?.['nodes'] ?? []) {
-        const entrantId = Number(rawSeed['entrant']?.['id']);
+      for (const rawSeed of rawGroup.seeds?.nodes ?? []) {
+        const entrantId = Number(rawSeed.entrant?.id);
         if (Number.isFinite(entrantId)) {
           pool.entrantIds.add(entrantId);
         }
@@ -570,11 +544,9 @@ export function resolvePools(
   participantsByEntrant: Map<Id, Participant[]>,
   registrationOptions: RegistrationOption[],
 ) {
-  for (let registrationOption of registrationOptions) {
-    if (registrationOption.type != 'event') {
-      continue;
-    }
-
+  for (const registrationOption of registrationOptions.filter(
+    (option) => option.type === 'event',
+  )) {
     const collected = [
       ...(poolsByEvent.get(registrationOption.id)?.values() ?? []),
     ];
@@ -591,45 +563,45 @@ export function resolvePools(
 
     if (firstPhasePools.length === 0) {
       registrationOption.pools = [];
-      continue;
-    }
-
-    const pools = firstPhasePools.map((collectedPool) => {
-      const pool: Pool = {
-        id: collectedPool.id,
-        phase: collectedPool.phase,
-        name: collectedPool.name,
-      };
-      for (let entrantId of collectedPool.entrantIds) {
-        for (let participant of participantsByEntrant.get(entrantId) ?? []) {
-          participant.pools[registrationOption.id] = pool;
+    } else {
+      const pools = firstPhasePools.map((collectedPool) => {
+        const pool: Pool = {
+          id: collectedPool.id,
+          phase: collectedPool.phase,
+          name: collectedPool.name,
+        };
+        for (const entrantId of collectedPool.entrantIds) {
+          for (const participant of participantsByEntrant.get(entrantId) ??
+            []) {
+            participant.pools[registrationOption.id] = pool;
+          }
         }
-      }
-      return pool;
-    });
+        return pool;
+      });
 
-    registrationOption.pools = [...pools, UNSEEDED_POOL];
+      registrationOption.pools = [...pools, UNSEEDED_POOL];
+    }
   }
 }
 
 function maxTotalPages(pageInfos: { [x: string]: any }[]) {
   return pageInfos.reduce(
-    (most, pageInfo) => Math.max(most, pageInfo?.['totalPages'] ?? 0),
+    (most, pageInfo) => Math.max(most, pageInfo?.totalPages ?? 0),
     0,
   );
 }
 
 export async function getRegistration(cookies: Cookie[], slugOrShort: string) {
-  let participants: Participant[] = [];
-  let registrationOptions: RegistrationOption[] = [];
+  const participants: Participant[] = [];
+  const registrationOptions: RegistrationOption[] = [];
   const participantsByEntrant = new Map<Id, Participant[]>();
   const throttle = makeRequestThrottle();
 
   await throttle();
-  let eventsQuery = await fetchUnofficialGql(cookies, GQL_GET_EVENTS, {
+  const eventsQuery = await fetchUnofficialGql(cookies, GQL_GET_EVENTS, {
     tournamentSlug: slugOrShort,
   });
-  if (eventsQuery == undefined) {
+  if (eventsQuery == null) {
     return undefined;
   }
   ingestEvents(eventsQuery, registrationOptions);
@@ -642,16 +614,15 @@ export async function getRegistration(cookies: Cookie[], slugOrShort: string) {
       tournamentSlug: slugOrShort,
     },
   );
-  if (participantsQuery == undefined) {
+  if (participantsQuery == null) {
     return undefined;
   }
   ingestParticipants(participantsQuery, participants, participantsByEntrant);
 
   let participantPage = 1;
   while (
-    participantsQuery['tournamentRegistrationInfo']['participants']['pageInfo'][
-      'totalPages'
-    ] > participantPage
+    participantsQuery.tournamentRegistrationInfo.participants.pageInfo
+      .totalPages > participantPage
   ) {
     participantPage += 1;
     if (participantPage > MAX_PARTICIPANT_PAGES) {
@@ -669,7 +640,7 @@ export async function getRegistration(cookies: Cookie[], slugOrShort: string) {
         page: participantPage,
       },
     );
-    if (participantsQuery == undefined) {
+    if (participantsQuery == null) {
       return undefined;
     }
     ingestParticipants(participantsQuery, participants, participantsByEntrant);
@@ -687,35 +658,34 @@ export async function getRegistration(cookies: Cookie[], slugOrShort: string) {
       await throttle();
       const poolsQuery = await fetchUnofficialGql(cookies, GQL_GET_POOLS, {
         tournamentSlug: slugOrShort,
-        groupPage: groupPage,
-        seedPage: seedPage,
+        groupPage,
+        seedPage,
       });
-      if (poolsQuery == undefined) {
+      if (poolsQuery == null) {
         return undefined;
       }
 
-      const rawTournament = poolsQuery['tournament'];
-      if (rawTournament == undefined) {
+      const rawTournament = poolsQuery.tournament;
+      if (rawTournament == null) {
         throw new Error(`No tournament found for slug: ${slugOrShort}`);
       }
-      name = rawTournament['name'] ?? '';
-      slug = rawTournament['slug'] ?? '';
+      name = rawTournament.name ?? '';
+      slug = rawTournament.slug ?? '';
       ingestPools(poolsQuery, poolsByEvent);
 
-      const rawEvents = rawTournament['events'] ?? [];
+      const rawEvents = rawTournament.events ?? [];
       const rawGroups = rawEvents.flatMap(
-        (rawEvent: { [x: string]: any }) =>
-          rawEvent['paginatedPhaseGroups']['nodes'],
+        (rawEvent: { [x: string]: any }) => rawEvent.paginatedPhaseGroups.nodes,
       );
       maxGroupPages = maxTotalPages(
         rawEvents.map(
           (rawEvent: { [x: string]: any }) =>
-            rawEvent['paginatedPhaseGroups']['pageInfo'],
+            rawEvent.paginatedPhaseGroups.pageInfo,
         ),
       );
       const maxSeedPages = maxTotalPages(
         rawGroups.map(
-          (rawGroup: { [x: string]: any }) => rawGroup['seeds']?.['pageInfo'],
+          (rawGroup: { [x: string]: any }) => rawGroup.seeds?.pageInfo,
         ),
       );
 
@@ -745,11 +715,35 @@ export async function getRegistration(cookies: Cookie[], slugOrShort: string) {
   resolvePools(poolsByEvent, participantsByEntrant, registrationOptions);
 
   return {
-    name: name,
-    slug: slug,
-    participants: participants,
-    registrationOptions: registrationOptions,
+    name,
+    slug,
+    participants,
+    registrationOptions,
   };
+}
+
+export async function getTournament(cookies: Cookie[], slug: string) {
+  return getRegistration(cookies, slug).then((registration) => {
+    if (registration == null) {
+      return undefined;
+    }
+
+    const tournament = {
+      ...registration,
+      updatingCheckboxes: [],
+    };
+
+    if (currentTournament?.slug !== registration.slug) {
+      currentSearchText = '';
+      currentFilters = {};
+    }
+
+    pendingRollbacks.clear();
+
+    currentTournament = tournament;
+    applyFilters(currentTournament.participants);
+    return tournament;
+  });
 }
 
 const UPDATE_PARTICIPANT_REGISTRATION_QUERY = `
@@ -791,11 +785,11 @@ export async function updateParticipantRegistration(
 ) {
   const participant = getParticipant(attendee);
   if (
-    currentTournament == undefined ||
-    venueFeeOption == undefined ||
-    participant == undefined
+    currentTournament == null ||
+    venueFeeOption == null ||
+    participant == null
   ) {
-    return;
+    return undefined;
   }
 
   const tournament = currentTournament;
@@ -807,7 +801,7 @@ export async function updateParticipantRegistration(
   const paidIds = Object.entries(participant.paidStatuses)
     .filter(([, paid]) => paid)
     .map(([optionId]) => optionId)
-    .filter((optionId) => optionId != String(venueFeeOption));
+    .filter((optionId) => optionId !== String(venueFeeOption));
 
   return fetchUnofficialGql(
     cookies,
@@ -816,7 +810,7 @@ export async function updateParticipantRegistration(
       participantId: attendee,
       regValueId: venueFeeOption,
       regValuePaid: participant.paidStatuses[venueFeeOption],
-      eventIds: eventIds,
+      eventIds,
       paidEventIds: paidIds,
     },
     GQL_TYPE.MUTATION,
@@ -824,31 +818,29 @@ export async function updateParticipantRegistration(
     (queryResponse) => {
       const currentParticipant = getParticipant(attendee);
       pendingRollbacks.delete(checkboxKey(attendee, option));
-      if (currentTournament == undefined || currentParticipant == undefined) {
-        return;
+      if (currentTournament == null || currentParticipant == null) {
+        return undefined;
       }
 
       currentParticipant.paidStatuses = {};
       currentParticipant.registeredStatuses = {};
-      for (let registrationSelection of queryResponse[
-        'updateParticipantRegistration'
-      ]['registrationSelections']) {
-        const balance = registrationSelection['balance'];
-        if (registrationSelection['regValue']['optionType'] == 'event') {
-          const eventId = registrationSelection['regValue']['optionTypeId'];
+      for (const registrationSelection of queryResponse
+        .updateParticipantRegistration.registrationSelections) {
+        const { balance } = registrationSelection;
+        if (registrationSelection.regValue.optionType === 'event') {
+          const eventId = registrationSelection.regValue.optionTypeId;
           currentParticipant.registeredStatuses[eventId] = true;
-          currentParticipant.paidStatuses[eventId] = balance == 0;
-        } else if (
-          registrationSelection['regValue']['optionType'] == 'tournament'
-        ) {
-          const eventId = registrationSelection['regValue']['id'];
-          currentParticipant.paidStatuses[eventId] = balance == 0;
+          currentParticipant.paidStatuses[eventId] = isZeroAmount(balance);
+        } else if (registrationSelection.regValue.optionType === 'tournament') {
+          const eventId = registrationSelection.regValue.id;
+          currentParticipant.paidStatuses[eventId] = isZeroAmount(balance);
         }
       }
 
       clearUpdatingCheckbox(tournament, attendee, option);
 
       applyFilters([currentParticipant]);
+      return undefined;
     },
     (e) => {
       rollBackToggle(attendee, option);
@@ -877,9 +869,9 @@ export function getVisibleParticipantsText() {
 export async function toggleParticipantPaid(attendee: Id, option: Id) {
   const participant = getParticipant(attendee);
   if (
-    currentTournament == undefined ||
-    venueFeeOption == undefined ||
-    participant == undefined
+    currentTournament == null ||
+    venueFeeOption == null ||
+    participant == null
   ) {
     return;
   }
@@ -890,9 +882,9 @@ export async function toggleParticipantPaid(attendee: Id, option: Id) {
   participant.paidStatuses[option] = justPaid;
 
   const registrationOption = currentTournament.registrationOptions.find(
-    (regOption) => regOption.id == option,
+    (regOption) => regOption.id === option,
   );
-  if (justPaid && registrationOption?.type == 'event') {
+  if (justPaid && registrationOption?.type === 'event') {
     participant.registeredStatuses[option] = true;
   }
 
@@ -901,7 +893,7 @@ export async function toggleParticipantPaid(attendee: Id, option: Id) {
 
 export async function toggleParticipantAdded(attendee: Id, option: Id) {
   const participant = getParticipant(attendee);
-  if (currentTournament == undefined || participant == undefined) {
+  if (currentTournament == null || participant == null) {
     return;
   }
 
@@ -931,7 +923,7 @@ export async function getAdminedTournaments(
 ): Promise<AdminedTournament[] | undefined> {
   return fetchUnofficialGql(cookies, GET_TOURNAMENTS_QUERY, {})
     .then(async (data) => {
-      if (data == undefined) {
+      if (data == null) {
         return undefined;
       }
 

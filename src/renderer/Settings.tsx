@@ -1,13 +1,11 @@
 import {
   Settings as SettingsIcon,
   Login as LoginIcon,
-  Refresh,
   Edit,
   Logout,
 } from '@mui/icons-material';
 import {
   Button,
-  CircularProgress,
   Dialog,
   DialogContent,
   DialogTitle,
@@ -18,10 +16,9 @@ import {
   Tooltip,
   Typography,
 } from '@mui/material';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { AdminedTournament, Tournament } from '../common/types';
 import StartggTournamentSelectorForm from './StartggTournamentSelectorForm';
-import { start } from 'repl';
 
 export default function Settings({
   loggedInStatus,
@@ -42,7 +39,6 @@ export default function Settings({
   adminedTournaments: AdminedTournament[];
   gettingAdminedTournaments: boolean;
   setSlugDialogOpen: (val: boolean) => void;
-  setGettingTournament: (val: boolean) => void;
   setGettingAdminedTournaments: (gettingAdminedTournaments: boolean) => void;
   showErrorDialog: (errors: string[]) => void;
   getStartggTournament: (maybeSlug: string) => Promise<Tournament | undefined>;

@@ -30,7 +30,6 @@ afterEach(() => {
 function renderSettings(props: Partial<Parameters<typeof Settings>[0]> = {}) {
   const setSlugDialogOpen = jest.fn();
   const setGettingAdminedTournaments = jest.fn();
-  const setGettingTournament = jest.fn();
   const showErrorDialog = jest.fn();
   const getStartggTournament = jest.fn().mockResolvedValue(undefined);
   renderWithTheme(
@@ -42,7 +41,6 @@ function renderSettings(props: Partial<Parameters<typeof Settings>[0]> = {}) {
       adminedTournaments={[]}
       gettingAdminedTournaments={false}
       setSlugDialogOpen={setSlugDialogOpen}
-      setGettingTournament={setGettingTournament}
       setGettingAdminedTournaments={setGettingAdminedTournaments}
       showErrorDialog={showErrorDialog}
       getStartggTournament={getStartggTournament}
@@ -52,7 +50,6 @@ function renderSettings(props: Partial<Parameters<typeof Settings>[0]> = {}) {
   return {
     setSlugDialogOpen,
     setGettingAdminedTournaments,
-    setGettingTournament,
     showErrorDialog,
     getStartggTournament,
   };

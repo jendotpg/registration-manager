@@ -157,7 +157,9 @@ describe('wrappedFetch, on a retryable 5xx', () => {
     const error = await settled;
     expect(error).toBeInstanceOf(Error);
     // The same wording the first attempt uses for an unreachable network.
-    expect(error!.message).toBe('***You may not be connected to the internet***');
+    expect(error!.message).toBe(
+      '***You may not be connected to the internet***',
+    );
     expect(gql.fetchMock).toHaveBeenCalledTimes(2);
   });
 });
