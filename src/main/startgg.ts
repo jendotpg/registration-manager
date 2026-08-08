@@ -804,7 +804,7 @@ export function getVisibleParticipantsText() {
         ? `${participant.prefix}|${participant.displayName}`
         : participant.displayName,
     )
-    .join(',');
+    .join(', ');
 }
 
 export async function toggleParticipantPaid(attendee: Id, option: Id) {

@@ -713,3 +713,73 @@ describe('pool filtering', () => {
     expect(visible).toEqual(['Erin']);
   });
 });
+
+describe('getVisibleParticipantsText', () => {
+  async function loadNycMelee() {
+    mockNycMelee();
+    const startgg = loadStartgg();
+    await startgg.getTournament(COOKIES, 'nyc-melee-100');
+    return startgg;
+  }
+
+  /** Every box ticked - the state the renderer filters down from. */
+  function allPoolsOn(startgg: ReturnType<typeof loadStartgg>) {
+    return Object.fromEntries(
+      startgg
+        .getCurrentTournament()!
+        .registrationOptions.map((option): [Id, FilterState] => [
+          option.id,
+          {
+            ...DEFAULT_FILTER_STATE,
+            pools: Object.fromEntries(
+              (option.pools ?? []).map((pool) => [pool.id, true]),
+            ),
+          },
+        ]),
+    );
+  }
+
+  it('is empty before a tournament is loaded', () => {
+    expect(loadStartgg().getVisibleParticipantsText()).toBe('');
+  });
+
+  it('joins on a comma and a space, prefixing only who has a prefix', async () => {
+    const startgg = await loadNycMelee();
+
+    // The separator is what start.gg's add-players box expects on paste, so
+    // it is the contract - not incidental formatting.
+    expect(startgg.getVisibleParticipantsText()).toBe(
+      'TSM|Alice, Bob, Carol, Dave, Erin',
+    );
+  });
+
+  it('lists only who survived the pool filter', async () => {
+    const startgg = await loadNycMelee();
+
+    startgg.updateParticipantsFiltered('', {
+      ...allPoolsOn(startgg),
+      [SINGLES]: {
+        ...DEFAULT_FILTER_STATE,
+        pools: { 5001: true, 5002: false, [UNSEEDED_POOL_ID]: false },
+      },
+    });
+
+    expect(startgg.getVisibleParticipantsText()).toBe('TSM|Alice, Bob');
+  });
+
+  it('lists only who survived the search, matching on the prefix too', async () => {
+    const startgg = await loadNycMelee();
+
+    startgg.updateParticipantsFiltered('tsm', allPoolsOn(startgg));
+
+    expect(startgg.getVisibleParticipantsText()).toBe('TSM|Alice');
+  });
+
+  it('is empty when everyone is filtered out', async () => {
+    const startgg = await loadNycMelee();
+
+    startgg.updateParticipantsFiltered('nobody', allPoolsOn(startgg));
+
+    expect(startgg.getVisibleParticipantsText()).toBe('');
+  });
+});

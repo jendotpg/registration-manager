@@ -12,12 +12,16 @@ import Settings from './Settings';
 import StartggCheckin from './StartggCheckin';
 import { WindowEvent } from './setWindowEventListener';
 import ErrorDialog from './ErrorDialog';
+import CopyDialog from './CopyDialog';
 
-// TODO: pull user discriminators from startgg ?
-// TODO: improve copy dialog...
 // TODO: set up testing
+// TODO: write a README
+// TODO: fix all the warnings / linting errors...
+
 // TODO: performance fix for filtering - it slows down a LOT with big events...
+
 // TODO: fix building!! we're hardcoding the fucking python path LMFAOOO. i also cant build x86 windows binaries. use github actions?
+
 // TODO: main/startgg.ts and main/ipc.ts are coupled weirdly i think - look into this further... (the smell for me is copy text being generated in startgg - feels like the wrong place)
 // TODO: implement undo / redo tree?
 // TODO: improve teams handling?
@@ -205,9 +209,16 @@ function IndexPage() {
     window.electron.updateParticipantsFiltered(searchText, filterState);
   }, [searchText, filterState]);
 
+  const [copyDialogOpen, setCopyDialogOpen] = useState(false);
+  const [copyText, setCopyText] = useState('');
+
   const copyFilteredParticipants = async () => {
-    const clipboardValue = await window.electron.copyToClipboard();
-    showErrorDialog([`Copied value!\n${clipboardValue}`]);
+    try {
+      setCopyText(await window.electron.getCopyText());
+      setCopyDialogOpen(true);
+    } catch (e: any) {
+      showErrorDialog([e instanceof Error ? e.message : e]);
+    }
   };
 
   return (
@@ -236,6 +247,14 @@ function IndexPage() {
           setErrorDialogOpen(false);
         }}
         open={errorDialogOpen}
+      />
+
+      <CopyDialog
+        open={copyDialogOpen}
+        text={copyText}
+        onClose={() => {
+          setCopyDialogOpen(false);
+        }}
       />
 
       <Settings

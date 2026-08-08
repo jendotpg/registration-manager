@@ -26,6 +26,7 @@ const electronHandler = {
     searchText: string,
     filters: Record<Id, FilterState>,
   ) => ipcRenderer.invoke('updateParticipantsFiltered', searchText, filters),
+  getCopyText: (): Promise<string> => ipcRenderer.invoke('getCopyText'),
   copyToClipboard: (): Promise<string> => ipcRenderer.invoke('copyToClipboard'),
 
   onLoggedInStatus: (

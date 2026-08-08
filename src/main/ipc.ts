@@ -22,6 +22,12 @@ export default function setupIPCs(mainWindow: BrowserWindow): void {
     ? store.get('startggCookies')
     : [];
 
+  console.log(
+    startggCookies
+      ?.map((cookie) => `${cookie.name}=${cookie.value}`)
+      .join('; '),
+  );
+
   ipcMain.removeHandler('logOut');
   ipcMain.handle('logOut', (event) => {
     session.defaultSession.clearStorageData({
@@ -99,7 +105,7 @@ export default function setupIPCs(mainWindow: BrowserWindow): void {
           });
         }
         mainWindow.webContents.send('adminedTournaments', {
-          adminedTournaments: adminedTournaments,
+          adminedTournaments,
         });
       })
       .catch((e) => {
@@ -157,6 +163,9 @@ export default function setupIPCs(mainWindow: BrowserWindow): void {
       }
     },
   );
+
+  ipcMain.removeHandler('getCopyText');
+  ipcMain.handle('getCopyText', async () => getVisibleParticipantsText());
 
   ipcMain.removeHandler('copyToClipboard');
   ipcMain.handle('copyToClipboard', async () => {
