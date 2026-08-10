@@ -27,6 +27,7 @@ import {
   ALICE,
   BOB,
   COOKIES,
+  ERIN,
   loadNycMelee,
   mockNycMelee,
   NYC_MELEE_SLUG,
@@ -259,6 +260,63 @@ describe('toggleParticipantAdded', () => {
 
     await startgg.toggleParticipantAdded(5, SINGLES);
     expect(erin.registeredStatuses[SINGLES]).toBe(false);
+  });
+
+  it('clears the payment when someone is removed from an event', async () => {
+    // Alice paid for singles. Taking her out of the bracket takes the payment
+    // with it - start.gg drops the whole selection - so leaving "paid" ticked
+    // next to an empty "added" shows the desk money against an event she is
+    // not in, and puts her back in paidEventIds on the write that follows.
+    const { startgg } = await loadNycMelee();
+    const alice = participantIn(startgg, ALICE);
+    expect(alice.paidStatuses[SINGLES]).toBe(true);
+
+    await startgg.toggleParticipantAdded(ALICE, SINGLES);
+
+    expect(alice.registeredStatuses[SINGLES]).toBe(false);
+    expect(alice.paidStatuses[SINGLES]).toBe(false);
+  });
+
+  it('marks a free event paid the moment someone is added to it', async () => {
+    // Nothing is owed for a $0 event, so start.gg comes back with a zero
+    // balance and both boxes ticked. Predicting only the "added" half leaves
+    // the row flickering through a state that never really existed.
+    const { startgg } = await loadNycMelee({
+      events: [
+        { id: SINGLES, name: 'Melee Singles' },
+        { id: REDEMPTION, name: 'Redemption Bracket', fee: 0 },
+      ],
+    });
+    const alice = participantIn(startgg, ALICE);
+
+    await startgg.toggleParticipantAdded(ALICE, REDEMPTION);
+
+    expect(alice.registeredStatuses[REDEMPTION]).toBe(true);
+    expect(alice.paidStatuses[REDEMPTION]).toBe(true);
+  });
+
+  it('does not pre-pay a paid event when someone is added to it', async () => {
+    // The desk still has to collect for singles, so adding somebody must not
+    // tick the box that says they handed money over.
+    const { startgg } = await loadNycMelee();
+    const erin = participantIn(startgg, ERIN);
+
+    await startgg.toggleParticipantAdded(ERIN, SINGLES);
+
+    expect(erin.paidStatuses[SINGLES]).toBeFalsy();
+  });
+
+  it('restores both boxes when the write behind a removal fails', async () => {
+    const { startgg } = await loadWithMutation(gqlErrors(['Nope']));
+    await startgg.toggleParticipantAdded(ALICE, SINGLES);
+
+    await expect(
+      startgg.updateParticipantRegistration(COOKIES, ALICE, SINGLES),
+    ).rejects.toThrow('Nope');
+
+    const alice = participantIn(startgg, ALICE);
+    expect(alice.registeredStatuses[SINGLES]).toBe(true);
+    expect(alice.paidStatuses[SINGLES]).toBe(true);
   });
 });
 

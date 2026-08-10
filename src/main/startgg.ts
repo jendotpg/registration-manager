@@ -887,13 +887,13 @@ export async function toggleParticipantPaid(attendee: Id, option: Id) {
 
   recordRollback(participant, option);
 
-  const justPaid = !participant.paidStatuses[option];
-  participant.paidStatuses[option] = justPaid;
+  const nowPaying = !participant.paidStatuses[option];
+  participant.paidStatuses[option] = nowPaying;
 
   const registrationOption = currentTournament.registrationOptions.find(
     (regOption) => regOption.id === option,
   );
-  if (justPaid && registrationOption?.type === 'event') {
+  if (nowPaying && registrationOption?.type === 'event') {
     participant.registeredStatuses[option] = true;
   }
 
@@ -908,8 +908,21 @@ export async function toggleParticipantAdded(attendee: Id, option: Id) {
 
   recordRollback(participant, option);
 
-  participant.registeredStatuses[option] =
-    !participant.registeredStatuses[option];
+  const nowAdding = !participant.registeredStatuses[option];
+  participant.registeredStatuses[option] = nowAdding;
+
+  const registrationOption = currentTournament.registrationOptions.find(
+    (regOption) => regOption.id === option,
+  );
+  if (registrationOption?.type === 'event') {
+    if (!nowAdding) {
+      participant.paidStatuses[option] = false;
+    }
+    if (registrationOption.free) {
+      participant.paidStatuses[option] = true;
+    }
+  }
+
   currentTournament.updatingCheckboxes.push(checkboxKey(attendee, option));
 }
 
