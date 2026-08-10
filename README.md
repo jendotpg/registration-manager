@@ -77,11 +77,11 @@ npm run package   # sanity-check the binary in release/build/
 Then:
 
 ```bash
-npm run version:set 0.1.0    # writes package.json and release/app/package.json
-git commit -am "Release 0.1.0"
+npm run version:set 0.0.2    # writes package.json and release/app/package.json
+git commit -am "Release 0.0.2"
 git push origin main
-git tag -a v0.1.0 -m "v0.1.0"
-git push origin v0.1.0
+git tag -a v0.0.2 -m "v0.0.2"
+git push origin v0.0.2
 ```
 
 Watch the run in Actions. On success a draft release appears under Releases with three assets:
