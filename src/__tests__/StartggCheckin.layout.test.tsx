@@ -1,5 +1,5 @@
 /**
- * Column sizing and truncation tooltips.
+ * Column sizing, the two scroll boxes, and truncation tooltips.
  *
  * Split out from StartggCheckin.test.tsx because everything here needs jsdom's
  * missing geometry stubbed on HTMLElement.prototype, and the tooltip cases need
@@ -13,7 +13,7 @@
  *
  * @jest-environment jsdom
  */
-import { act, screen, within } from '@testing-library/react';
+import { act, fireEvent, screen, within } from '@testing-library/react';
 import StartggCheckin from '../renderer/StartggCheckin';
 import { installElectronMock } from '../__fixtures__/electronApi';
 import { stubLayoutMetrics } from '../__fixtures__/layoutMetrics';
@@ -308,5 +308,35 @@ describe('re-measuring on every hover', () => {
     await user.hover(name);
 
     expect(name.getAttribute('aria-label')).toBe('');
+  });
+});
+
+describe('the header following the rows sideways', () => {
+  /*
+   * The rows scroll inside react-window's List, which owns both axes because the
+   * frozen name column depends on the horizontal scroller being the element that
+   * clips it. That puts the header in a box of its own, so the only thing keeping
+   * a heading over its checkboxes when the table is scrolled right is this mirror.
+   */
+  const listElement = () =>
+    document.querySelector('[role="list"]') as HTMLElement;
+  const headerViewport = () =>
+    listElement().previousElementSibling as HTMLElement;
+
+  it('mirrors the list scroll position onto the header', () => {
+    renderCheckin();
+    const list = listElement();
+
+    list.scrollLeft = 120;
+    fireEvent.scroll(list);
+
+    expect(headerViewport().scrollLeft).toBe(120);
+  });
+
+  it('starts them both at the left edge', () => {
+    renderCheckin();
+
+    expect(listElement().scrollLeft).toBe(0);
+    expect(headerViewport().scrollLeft).toBe(0);
   });
 });

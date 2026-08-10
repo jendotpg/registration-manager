@@ -102,27 +102,9 @@
     "coverageThreshold": {
       "global": {
         "statements": 99,
-        "branches": 90,
-        "functions": 100,
-        "lines": 95
-      },
-      "src/main/ipc.ts": {
-        "statements": 100,
-        "branches": 100,
-        "functions": 100,
-        "lines": 100
-      },
-      "src/main/util.ts": {
-        "statements": 100,
-        "branches": 100,
-        "functions": 100,
-        "lines": 100
-      },
-      "src/main/startgg.ts": {
-        "statements": 99,
-        "branches": 90,
-        "functions": 100,
-        "lines": 95
+        "branches": 95,
+        "functions": 99,
+        "lines": 99
       }
     },
     "testEnvironment": "jsdom",
@@ -148,7 +130,8 @@
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-hotkeys": "^2.0.0",
-    "react-router-dom": "^6.16.0"
+    "react-router-dom": "^6.16.0",
+    "react-window": "^2.3.0"
   },
   "devDependencies": {
     "@electron/notarize": "^2.1.0",

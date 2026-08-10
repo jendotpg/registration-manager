@@ -14,9 +14,10 @@
  *
  * @jest-environment jsdom
  */
-import { screen, within } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import { FilterState, Id, NullableBoolean, Tournament } from '../common/types';
-import StartggCheckin, { disabledReason } from '../renderer/StartggCheckin';
+import StartggCheckin from '../renderer/StartggCheckin';
+import { disabledReason } from '../renderer/ParticipantRow';
 import { installElectronMock } from '../__fixtures__/electronApi';
 import { renderWithTheme, setupUser } from '../__fixtures__/renderWithTheme';
 import {
@@ -478,14 +479,21 @@ describe('the header controls', () => {
     expect(screen.getByLabelText('Search players')).toHaveValue('alice');
   });
 
-  it('reports each keystroke in the search box', async () => {
+  it('reports the search once the typing stops, not once per keystroke', async () => {
+    // The box holds its own text so that a keystroke costs one TextField rather
+    // than the whole table, and reports upwards on a trailing debounce. What
+    // must not lag is the text itself. The call count is asserted loosely rather
+    // than as exactly one: a slow enough machine could let the debounce elapse
+    // mid-word, which is correct behaviour, but nothing may make it per-character.
     const user = setupUser();
     const { setSearchText } = renderCheckin();
+    const input = screen.getByLabelText('Search players');
 
-    await user.type(screen.getByLabelText('Search players'), 'ab');
+    await user.type(input, 'abc');
 
-    expect(setSearchText).toHaveBeenNthCalledWith(1, 'a');
-    expect(setSearchText).toHaveBeenNthCalledWith(2, 'b');
+    expect(input).toHaveValue('abc');
+    await waitFor(() => expect(setSearchText).toHaveBeenLastCalledWith('abc'));
+    expect(setSearchText.mock.calls.length).toBeLessThan(3);
   });
 
   it('copies the listed participants', async () => {

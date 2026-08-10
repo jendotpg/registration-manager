@@ -49,6 +49,14 @@ module.exports = {
       files: ['src/__tests__/**/*.{ts,tsx}', 'src/__fixtures__/**/*.{ts,tsx}'],
       rules: {
         'react/jsx-props-no-spreading': 'off',
+        // expectNoGrowth in responsiveness.test.tsx is an assertion: the
+        // comparison it makes is conditional on the measurement being large
+        // enough to mean anything, which is not something an inline expect can
+        // express.
+        'jest/expect-expect': [
+          'warn',
+          { assertFunctionNames: ['expect', 'expectNoGrowth'] },
+        ],
       },
     },
   ],

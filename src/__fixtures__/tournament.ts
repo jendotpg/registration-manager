@@ -221,3 +221,130 @@ export function updatingTournament(
 ): Tournament {
   return nycMeleeTournament({ updatingCheckboxes: [`${attendee};${option}`] });
 }
+
+/*
+ * Below here: the load generator for the responsiveness suites.
+ *
+ * Everything above is a fidelity fixture - it is the shape start.gg really
+ * hands back, and fixtureConsistency.test.ts holds it to that. bigTournament is
+ * the opposite: nobody asserts that a real tournament looks like this, only that
+ * the interface stays responsive when one is this big. Its ids are deliberately
+ * far away from the NYC Melee ones so a suite that mixes the two cannot get a
+ * false pass from a collision.
+ */
+
+const BIG_OPTION_ID_BASE = 10_000;
+const BIG_POOL_ID_BASE = 20_000;
+const BIG_PARTICIPANT_ID_BASE = 100_000;
+
+/** The venue fee option every bigTournament leads with. */
+export const BIG_VENUE_FEE: Id = BIG_OPTION_ID_BASE;
+
+/**
+ * A sponsor prefix carried by exactly BIG_RARE_COUNT participants, so a search
+ * of three characters takes any size of tournament down to a handful of rows.
+ * Without it "Player" matches everyone and "Player 1" matches a third of them,
+ * neither of which exercises the narrowing path.
+ */
+export const BIG_RARE_PREFIX = 'ZEPHYR';
+export const BIG_RARE_COUNT = 3;
+
+export function bigTournamentOptionId(index: number): Id {
+  return BIG_OPTION_ID_BASE + 1 + index;
+}
+
+export function bigTournamentParticipantId(index: number): Id {
+  return BIG_PARTICIPANT_ID_BASE + index;
+}
+
+/**
+ * A tournament of arbitrary size: one venue fee option plus `events` event
+ * options, each with `poolsPerEvent` pools, and `participants` attendees spread
+ * deterministically across paid / added / pooled states.
+ *
+ * The venue fee option is not optional decoration. It is the only option type
+ * that renders a medium Checkbox, which is what sets the row height, so a
+ * fixture without one would measure rows 4px shorter than production ones.
+ *
+ * The status spread is deliberately uneven. Uniform statuses let a memoised row
+ * bail out for the wrong reason - every row identical means every row's props
+ * compare equal by luck - and would flatter any measurement taken here.
+ */
+export function bigTournament({
+  participants = 300,
+  events = 8,
+  poolsPerEvent = 4,
+}: {
+  participants?: number;
+  events?: number;
+  poolsPerEvent?: number;
+} = {}): Tournament {
+  const eventOptions = Array.from({ length: events }, (unused, eventIndex) => {
+    const id = bigTournamentOptionId(eventIndex);
+    const name = `Event ${eventIndex + 1}`;
+    return makeRegistrationOption({
+      id,
+      name,
+      type: 'event',
+      options: [name],
+      pools: [
+        ...Array.from({ length: poolsPerEvent }, (alsoUnused, poolIndex) =>
+          makePool({
+            id: BIG_POOL_ID_BASE + eventIndex * 100 + poolIndex,
+            phase: 'Pools',
+            name: `${poolIndex + 1}`,
+          }),
+        ),
+        UNSEEDED_POOL,
+      ],
+    });
+  });
+
+  const registrationOptions: RegistrationOption[] = [
+    makeRegistrationOption({
+      id: BIG_VENUE_FEE,
+      name: 'Venue Fee',
+      type: 'tournament',
+      options: ['Venue Fee'],
+    }),
+    ...eventOptions,
+  ];
+
+  const rareEvery = Math.max(1, Math.floor(participants / BIG_RARE_COUNT));
+
+  const attendees = Array.from({ length: participants }, (unused, index) => {
+    const paidStatuses: Record<Id, boolean> = {
+      [BIG_VENUE_FEE]: index % 2 === 0,
+    };
+    const registeredStatuses: Record<Id, boolean> = {};
+    const pools: Record<Id, Pool> = {};
+
+    eventOptions.forEach((option, eventIndex) => {
+      // Every participant is in every event, so the grid is dense: a sparse one
+      // would render fewer checked boxes but exactly as many checkboxes, and
+      // the mount cost is what is being measured.
+      registeredStatuses[option.id] = (index + eventIndex) % 4 !== 0;
+      paidStatuses[option.id] = (index + eventIndex) % 3 === 0;
+      const poolOptions = option.pools ?? [];
+      pools[option.id] =
+        poolOptions[(index + eventIndex) % poolOptions.length] ?? UNSEEDED_POOL;
+    });
+
+    const rare = index % rareEvery === rareEvery - 1;
+    return makeParticipant({
+      id: bigTournamentParticipantId(index),
+      displayName: `Player ${String(index).padStart(3, '0')}`,
+      prefix: rare ? BIG_RARE_PREFIX : '',
+      paidStatuses,
+      registeredStatuses,
+      pools,
+    });
+  });
+
+  return makeTournament({
+    slug: 'tournament/big-tournament',
+    name: 'Big Tournament',
+    registrationOptions,
+    participants: attendees,
+  });
+}

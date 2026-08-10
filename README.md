@@ -8,10 +8,9 @@ An app for managing tournament registration and payment via start.gg, built by j
 
 Most notably:
 
-- **Performance is a known issue.** Even fairly large regionals will likely hit slowdowns. It's not even close to ready for majors
 - **Doubles support** isn't here yet. I'd love to build it (I love doubles!), but NYC Melee doesn't need it right now, so it's not a priority for me to build solo.
 
-If either of these (or anything else) matters to you, reach out — I'm happy to prioritize building out features for people who will actually use them.
+If this (or anything else) matters to you, reach out — I'm happy to prioritize building out features for people who will actually use them.
 
 ## Development
 
