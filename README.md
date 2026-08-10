@@ -71,7 +71,7 @@ npm test
 npm run package   # sanity-check the binary in release/build/
 ```
 
-`npm test` is bare `jest`. The 99% `coverageThreshold` in `package.json` applies only to
+`npm test` is bare `jest`. The`coverageThreshold` in `package.json` applies only to
 `npm run test:coverage`, so it does not gate CI.
 
 Then:
