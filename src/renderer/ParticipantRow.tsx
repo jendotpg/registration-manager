@@ -6,12 +6,15 @@ import {
   Participant,
   RegistrationOption,
   Tournament,
+  UNSEEDED_POOL_ID,
+  hasPoolsConfigured,
 } from '../common/types';
 import EllipsisTooltip from './EllipsisTooltip';
 import {
   COLUMN_GAP,
   CONTROL_GAP,
   NAME_COL_WIDTH,
+  POOL_COL_WIDTH_PX,
   ROW_PADDING_X_PX,
   TOOLTIP_ENTER_DELAY_MS,
 } from './checkinMetrics';
@@ -158,7 +161,7 @@ export default function ParticipantRow({
         spacing={COLUMN_GAP}
         sx={CELLS_SX}
       >
-        {startggTournament.registrationOptions.map((registrationOption) => {
+        {startggTournament.registrationOptions.flatMap((registrationOption) => {
           const { id } = registrationOption;
           const isEvent = registrationOption.type === 'event';
           const cellSx = { width: `${widths[id]}px`, flexShrink: 0 };
@@ -176,9 +179,17 @@ export default function ParticipantRow({
             />
           );
 
-          return isEvent ? (
+          const showPoolCol = hasPoolsConfigured(registrationOption);
+          const pool = tournamentParticipant.pools[id];
+          const poolDisplay =
+            pool && pool.id !== UNSEEDED_POOL_ID
+              ? pool.name || pool.phase || '—'
+              : '—';
+
+          const optionCell = isEvent ? (
             <Stack
               key={`${id}-checkboxes`}
+              data-option-cell={id}
               direction="row"
               spacing={CONTROL_GAP}
               justifyContent="center"
@@ -198,10 +209,46 @@ export default function ParticipantRow({
               />
             </Stack>
           ) : (
-            <Stack key={`${id}-checkboxes`} alignItems="center" sx={cellSx}>
+            <Stack
+              key={`${id}-checkboxes`}
+              data-option-cell={id}
+              alignItems="center"
+              sx={cellSx}
+            >
               {paidCell}
             </Stack>
           );
+
+          if (!showPoolCol) {
+            return [optionCell];
+          }
+
+          const poolCell = (
+            <Stack
+              key={`${id}-pool`}
+              data-pool-cell={id}
+              justifyContent="center"
+              alignItems="center"
+              sx={{ width: `${POOL_COL_WIDTH_PX}px`, flexShrink: 0 }}
+            >
+              <EllipsisTooltip title={poolDisplay}>
+                <Typography
+                  noWrap
+                  align="center"
+                  sx={{
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    color:
+                      poolDisplay === '—' ? 'text.secondary' : 'text.primary',
+                  }}
+                >
+                  {poolDisplay}
+                </Typography>
+              </EllipsisTooltip>
+            </Stack>
+          );
+
+          return [optionCell, poolCell];
         })}
       </Stack>
     </Stack>

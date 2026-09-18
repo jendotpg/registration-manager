@@ -27,6 +27,7 @@ import {
   Id,
   FilterState,
   DEFAULT_FILTER_STATE,
+  hasPoolsConfigured,
 } from '../common/types';
 import { PaidMenu, AddedMenu } from './FilterMenus';
 import SearchField from './SearchField';
@@ -40,8 +41,10 @@ import {
   NAME_COL_MAX_PX,
   NAME_COL_MIN_PX,
   NAME_COL_WIDTH,
+  POOL_COL_WIDTH_PX,
   ROW_HEIGHT_PX,
   ROW_PADDING_X_PX,
+  SMALL_CONTROL_PX,
   SMALL_ICON_BUTTON_SX,
   TOOLTIP_ENTER_DELAY_MS,
   columnWidths as computeColumnWidths,
@@ -215,15 +218,20 @@ export default function StartggCheckin({
   );
 
   const optionCount = startggTournament.registrationOptions.length;
+  const poolColCount =
+    startggTournament.registrationOptions.filter(hasPoolsConfigured).length;
+  const totalColumnCount = optionCount + poolColCount;
   const columnWidthTotalPx = startggTournament.registrationOptions.reduce(
     (total, registrationOption) => total + widths[registrationOption.id],
     0,
   );
+  const poolColWidthTotalPx = poolColCount * POOL_COL_WIDTH_PX;
   const restPx =
     ROW_PADDING_X_PX * 2 +
     COLUMN_GAP_PX +
     columnWidthTotalPx +
-    COLUMN_GAP_PX * Math.max(0, optionCount - 1);
+    poolColWidthTotalPx +
+    COLUMN_GAP_PX * Math.max(0, totalColumnCount - 1);
   const nameColPx = Math.min(
     NAME_COL_MAX_PX,
     Math.max(NAME_COL_MIN_PX, restPx / 3),
@@ -366,14 +374,17 @@ export default function StartggCheckin({
                   justifyContent: 'space-between',
                 }}
               >
-                {startggTournament.registrationOptions.map(
+                {startggTournament.registrationOptions.flatMap(
                   (registrationOption) => {
                     const { id } = registrationOption;
                     const isEvent = registrationOption.type === 'event';
                     const filter = filterFor(id);
-                    return (
+                    const showPoolCol = hasPoolsConfigured(registrationOption);
+
+                    const cols = [
                       <Stack
                         key={id}
+                        data-option-cell={id}
                         sx={{
                           width: `${widths[id]}px`,
                           zIndex: 3,
@@ -449,8 +460,45 @@ export default function StartggCheckin({
                             </>
                           )}
                         </Stack>
-                      </Stack>
-                    );
+                      </Stack>,
+                    ];
+
+                    if (showPoolCol) {
+                      cols.push(
+                        <Stack
+                          key={`${id}-pool`}
+                          data-pool-header={id}
+                          sx={{
+                            width: `${POOL_COL_WIDTH_PX}px`,
+                            zIndex: 3,
+                            flexShrink: 0,
+                          }}
+                        >
+                          <Typography
+                            noWrap
+                            align="center"
+                            sx={{
+                              fontWeight: 'bold',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                            }}
+                          >
+                            Pool
+                          </Typography>
+                          <Stack
+                            direction="row"
+                            justifyContent="center"
+                            sx={{
+                              width: '100%',
+                              minWidth: '100%',
+                              height: `${SMALL_CONTROL_PX}px`,
+                            }}
+                          />
+                        </Stack>,
+                      );
+                    }
+
+                    return cols;
                   },
                 )}
               </Stack>

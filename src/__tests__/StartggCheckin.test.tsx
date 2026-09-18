@@ -702,4 +702,26 @@ describe('the filter menus', () => {
     expect(screen.getByRole('checkbox', { name: 'Added' })).toBeInTheDocument();
     expect(screen.getByRole('checkbox', { name: 'Pools' })).toBeInTheDocument();
   });
+
+  it('renders a pool column next to events with pools configured', () => {
+    renderCheckin();
+    const poolHeaders = screen
+      .getAllByText('Pool')
+      .filter((el) => el.closest('[data-pool-header]'));
+    // Both Melee Singles and Redemption Bracket have pools
+    expect(poolHeaders).toHaveLength(2);
+
+    // Bob is in Singles Pool 1 and unseeded in Redemption
+    const bobRow = rowFor('Bob');
+    expect(within(bobRow).getByText('1')).toBeInTheDocument();
+  });
+
+  it('omits the pool column for events that do not have pools configured', () => {
+    const tournament = nycMeleeTournament();
+    delete tournament.registrationOptions[1].pools;
+    delete tournament.registrationOptions[2].pools;
+    renderCheckin({ startggTournament: tournament });
+
+    expect(screen.queryByText('Pool')).not.toBeInTheDocument();
+  });
 });

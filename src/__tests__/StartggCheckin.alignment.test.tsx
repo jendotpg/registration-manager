@@ -196,7 +196,11 @@ function headerColumn(optionName: string) {
 function bodyCells(participantName: string) {
   const nameCell = screen.getByText(participantName).parentElement!;
   const row = nameCell.parentElement!;
-  return Array.from(row.children[1].children) as HTMLElement[];
+  return Array.from(
+    row.children[1].querySelectorAll<HTMLElement>(
+      ':scope > [data-option-cell]',
+    ),
+  );
 }
 
 function bodyCell(participantName: string, optionIndex: number) {
@@ -424,5 +428,64 @@ describe('the control sizes the alignment depends on', () => {
 
     expect(getComputedStyle(body.cell).flexDirection).toBe('column');
     expect(getComputedStyle(body.cell).alignItems).toBe('center');
+  });
+});
+
+describe('the pool column alignment', () => {
+  it('gives each Pool header and its body cell the same width', () => {
+    renderCheckin();
+    const poolHeaders = screen
+      .getAllByText('Pool')
+      .filter((el) => el.closest('[data-pool-header]'));
+    expect(poolHeaders.length).toBeGreaterThan(0);
+
+    const nameCell = screen.getByText('Bob').parentElement!;
+    const row = nameCell.parentElement!;
+    const poolCells = Array.from(
+      row.children[1].querySelectorAll<HTMLElement>(
+        ':scope > [data-pool-cell]',
+      ),
+    );
+    expect(poolCells.length).toBe(poolHeaders.length);
+
+    poolHeaders.forEach((headerEl, idx) => {
+      const headerStack = headerEl.parentElement as HTMLElement;
+      const bodyStack = poolCells[idx];
+      expect(pxValue(getComputedStyle(bodyStack).width)).toBe(
+        pxValue(getComputedStyle(headerStack).width),
+      );
+    });
+  });
+
+  it('centres the Pool header label and the body pool identifier', () => {
+    renderCheckin();
+    const poolHeaders = screen
+      .getAllByText('Pool')
+      .filter((el) => el.closest('[data-pool-header]'));
+
+    poolHeaders.forEach((headerEl) => {
+      expect(
+        getComputedStyle(headerEl)
+          .getPropertyValue('--Typography-textAlign')
+          .trim(),
+      ).toBe('center');
+    });
+
+    const nameCell = screen.getByText('Bob').parentElement!;
+    const row = nameCell.parentElement!;
+    const poolCells = Array.from(
+      row.children[1].querySelectorAll<HTMLElement>(
+        ':scope > [data-pool-cell]',
+      ),
+    );
+
+    poolCells.forEach((cell) => {
+      const text = cell.querySelector('p, span') as HTMLElement;
+      expect(
+        getComputedStyle(text)
+          .getPropertyValue('--Typography-textAlign')
+          .trim(),
+      ).toBe('center');
+    });
   });
 });
