@@ -496,6 +496,19 @@ export default function StartggCheckin({
                           />
                         </Stack>,
                       );
+                      // Grouped so the space-between spread never pulls the
+                      // Pool column away from its event.
+                      return [
+                        <Stack
+                          key={`${id}-group`}
+                          direction="row"
+                          alignItems="center"
+                          spacing={COLUMN_GAP}
+                          sx={{ flexShrink: 0 }}
+                        >
+                          {cols}
+                        </Stack>,
+                      ];
                     }
 
                     return cols;

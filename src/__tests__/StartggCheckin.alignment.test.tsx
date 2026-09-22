@@ -197,9 +197,7 @@ function bodyCells(participantName: string) {
   const nameCell = screen.getByText(participantName).parentElement!;
   const row = nameCell.parentElement!;
   return Array.from(
-    row.children[1].querySelectorAll<HTMLElement>(
-      ':scope > [data-option-cell]',
-    ),
+    row.children[1].querySelectorAll<HTMLElement>('[data-option-cell]'),
   );
 }
 
@@ -442,9 +440,7 @@ describe('the pool column alignment', () => {
     const nameCell = screen.getByText('Bob').parentElement!;
     const row = nameCell.parentElement!;
     const poolCells = Array.from(
-      row.children[1].querySelectorAll<HTMLElement>(
-        ':scope > [data-pool-cell]',
-      ),
+      row.children[1].querySelectorAll<HTMLElement>('[data-pool-cell]'),
     );
     expect(poolCells.length).toBe(poolHeaders.length);
 
@@ -474,9 +470,7 @@ describe('the pool column alignment', () => {
     const nameCell = screen.getByText('Bob').parentElement!;
     const row = nameCell.parentElement!;
     const poolCells = Array.from(
-      row.children[1].querySelectorAll<HTMLElement>(
-        ':scope > [data-pool-cell]',
-      ),
+      row.children[1].querySelectorAll<HTMLElement>('[data-pool-cell]'),
     );
 
     poolCells.forEach((cell) => {

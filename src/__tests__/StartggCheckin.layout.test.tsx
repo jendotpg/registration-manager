@@ -85,11 +85,19 @@ function columnWidth(optionName: string) {
 }
 
 /** The min-width the whole table asked for. */
+/**
+ * The header's table min-width: the nearest ancestor of a column heading that
+ * sets one. Walked rather than counted, since an event with pools sits one
+ * level deeper, grouped with its Pool column.
+ */
 function tableMinWidth() {
-  const heading = screen.getAllByText('Melee Singles').slice(-1)[0];
-  const table = heading.closest('[class*="MuiStack-root"]')!.parentElement!
-    .parentElement!.parentElement!;
-  return getComputedStyle(table).minWidth;
+  let el: HTMLElement | null = screen
+    .getAllByText('Melee Singles')
+    .slice(-1)[0];
+  while (el && !getComputedStyle(el).minWidth.endsWith('px')) {
+    el = el.parentElement;
+  }
+  return el ? getComputedStyle(el).minWidth : '';
 }
 
 describe('column widths with no measurement available', () => {
@@ -162,15 +170,7 @@ describe('the table minimum width', () => {
     screen.getByLabelText('Search players'); // sanity: still rendered
     restoreMetrics = stubLayoutMetrics({ boundingWidth: 300 });
     const { unmount } = renderCheckin();
-    const wide = parseFloat(
-      getComputedStyle(
-        screen
-          .getAllByText('Melee Singles')
-          .slice(-1)[0]
-          .closest('[class*="MuiStack-root"]')!.parentElement!.parentElement!
-          .parentElement!,
-      ).minWidth,
-    );
+    const wide = parseFloat(tableMinWidth());
     unmount();
 
     expect(wide).toBeGreaterThan(narrow);

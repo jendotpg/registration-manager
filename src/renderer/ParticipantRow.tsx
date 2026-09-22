@@ -74,6 +74,7 @@ const NAME_TEXT_SX = {
 } as const;
 
 const CELLS_SX = { flex: 1, justifyContent: 'space-between' } as const;
+const GROUP_SX = { flexShrink: 0 } as const;
 const ROW_SX = { boxSizing: 'border-box' } as const;
 
 function CheckboxCell({
@@ -248,7 +249,20 @@ export default function ParticipantRow({
             </Stack>
           );
 
-          return [optionCell, poolCell];
+          // Grouped so the space-between spread never pulls the Pool column
+          // away from its event.
+          return [
+            <Stack
+              key={`${id}-group`}
+              direction="row"
+              alignItems="center"
+              spacing={COLUMN_GAP}
+              sx={GROUP_SX}
+            >
+              {optionCell}
+              {poolCell}
+            </Stack>,
+          ];
         })}
       </Stack>
     </Stack>
