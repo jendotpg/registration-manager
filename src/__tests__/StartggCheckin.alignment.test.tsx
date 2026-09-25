@@ -74,6 +74,8 @@ function renderCheckin() {
       paidMenuOpen={{}}
       setPaidMenuOpen={jest.fn()}
       registeredMenuOpen={{}}
+      poolMenuOpen={{}}
+      setPoolMenuOpen={jest.fn()}
       setRegisteredMenuOpen={jest.fn()}
       resetFilters={jest.fn()}
     />,
@@ -136,11 +138,18 @@ function controlCentresPx(
   containerWidthPx: number,
 ): number[] {
   const style = getComputedStyle(container);
+  // A control inside a fixed-width slot is centred in that slot, so the slot's
+  // width is what places it.
   const items = (Array.from(container.children) as HTMLElement[]).map(
-    (wrapper) => ({
-      marginLeftPx: pxValue(getComputedStyle(wrapper).marginLeft),
-      widthPx: controlWidthPx(controlIn(wrapper)),
-    }),
+    (wrapper) => {
+      const wrapperStyle = getComputedStyle(wrapper);
+      return {
+        marginLeftPx: pxValue(wrapperStyle.marginLeft),
+        widthPx: wrapperStyle.width.endsWith('px')
+          ? parseFloat(wrapperStyle.width)
+          : controlWidthPx(controlIn(wrapper)),
+      };
+    },
   );
 
   if (style.flexDirection === 'column') {
@@ -196,7 +205,9 @@ function headerColumn(optionName: string) {
 function bodyCells(participantName: string) {
   const nameCell = screen.getByText(participantName).parentElement!;
   const row = nameCell.parentElement!;
-  return Array.from(row.children[1].children) as HTMLElement[];
+  return Array.from(
+    row.children[1].querySelectorAll<HTMLElement>('[data-option-cell]'),
+  );
 }
 
 function bodyCell(participantName: string, optionIndex: number) {
@@ -272,7 +283,7 @@ describe('each checkbox sits under its filter button', () => {
     },
   );
 
-  it('lines up the paid and added controls separately, not just as a group', () => {
+  it('lines up the paid, added and pool controls separately, not just as a group', () => {
     // The failure worth catching: two controls whose group is still centred but
     // which have drifted apart, so the left one is over the gap and the right
     // one over nothing.
@@ -283,9 +294,10 @@ describe('each checkbox sits under its filter button', () => {
     const headerCentres = controlCentresPx(header.controls, header.widthPx);
     const bodyCentres = controlCentresPx(body.cell, body.widthPx);
 
-    expect(headerCentres).toHaveLength(2);
-    expect(round(bodyCentres[0])).toBe(round(headerCentres[0]));
-    expect(round(bodyCentres[1])).toBe(round(headerCentres[1]));
+    expect(headerCentres).toHaveLength(3);
+    headerCentres.forEach((centre, idx) => {
+      expect(round(bodyCentres[idx])).toBe(round(centre));
+    });
     // And they are genuinely two distinct positions, so the assertion above is
     // not passing because everything collapsed to the same number.
     expect(bodyCentres[0]).not.toBe(bodyCentres[1]);
@@ -424,5 +436,60 @@ describe('the control sizes the alignment depends on', () => {
 
     expect(getComputedStyle(body.cell).flexDirection).toBe('column');
     expect(getComputedStyle(body.cell).alignItems).toBe('center');
+  });
+});
+
+describe('the pool column alignment', () => {
+  it('gives each Pool header and its body cell the same width', () => {
+    renderCheckin();
+    const poolHeaders = screen
+      .getAllByText('Pool')
+      .filter((el) => el.closest('[data-pool-header]'));
+    expect(poolHeaders.length).toBeGreaterThan(0);
+
+    const nameCell = screen.getByText('Bob').parentElement!;
+    const row = nameCell.parentElement!;
+    const poolCells = Array.from(
+      row.children[1].querySelectorAll<HTMLElement>('[data-pool-cell]'),
+    );
+    expect(poolCells.length).toBe(poolHeaders.length);
+
+    poolHeaders.forEach((headerEl, idx) => {
+      const headerStack = headerEl.parentElement as HTMLElement;
+      const bodyStack = poolCells[idx];
+      expect(pxValue(getComputedStyle(bodyStack).width)).toBe(
+        pxValue(getComputedStyle(headerStack).width),
+      );
+    });
+  });
+
+  it('centres the Pool header label and the body pool identifier', () => {
+    renderCheckin();
+    const poolHeaders = screen
+      .getAllByText('Pool')
+      .filter((el) => el.closest('[data-pool-header]'));
+
+    poolHeaders.forEach((headerEl) => {
+      expect(
+        getComputedStyle(headerEl)
+          .getPropertyValue('--Typography-textAlign')
+          .trim(),
+      ).toBe('center');
+    });
+
+    const nameCell = screen.getByText('Bob').parentElement!;
+    const row = nameCell.parentElement!;
+    const poolCells = Array.from(
+      row.children[1].querySelectorAll<HTMLElement>('[data-pool-cell]'),
+    );
+
+    poolCells.forEach((cell) => {
+      const text = cell.querySelector('p, span') as HTMLElement;
+      expect(
+        getComputedStyle(text)
+          .getPropertyValue('--Typography-textAlign')
+          .trim(),
+      ).toBe('center');
+    });
   });
 });

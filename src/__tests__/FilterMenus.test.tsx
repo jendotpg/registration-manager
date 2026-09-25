@@ -8,7 +8,7 @@
  */
 import { screen, waitFor, within } from '@testing-library/react';
 import { NullableBoolean, Pool, UNSEEDED_POOL } from '../common/types';
-import { AddedMenu, PaidMenu } from '../renderer/FilterMenus';
+import { AddedMenu, PaidMenu, PoolMenu } from '../renderer/FilterMenus';
 import { renderWithTheme, setupUser } from '../__fixtures__/renderWithTheme';
 import { POOL_A, POOL_B } from '../__fixtures__/tournament';
 
@@ -113,7 +113,6 @@ describe('PaidMenu', () => {
 describe('AddedMenu', () => {
   const renderMenu = (props: Partial<Parameters<typeof AddedMenu>[0]> = {}) => {
     const onAddedChange = jest.fn();
-    const onPoolsChange = jest.fn();
     const onClose = jest.fn();
     const result = renderWithTheme(
       <AddedMenu
@@ -122,6 +121,39 @@ describe('AddedMenu', () => {
         onClose={onClose}
         addedState={Indeterminate}
         onAddedChange={onAddedChange}
+        {...props}
+      />,
+    );
+    return { onAddedChange, onClose, ...result };
+  };
+
+  it('lists only the Added toggle', () => {
+    renderMenu();
+
+    const menu = screen.getByRole('menu');
+    expect(within(menu).getAllByRole('checkbox')).toHaveLength(1);
+    expect(checkboxLabelled('Added')).toBeInTheDocument();
+  });
+
+  it('cycles the Added filter like the Paid one', async () => {
+    const user = setupUser();
+    const { onAddedChange } = renderMenu({ addedState: Include });
+
+    await user.click(checkboxLabelled('Added'));
+
+    expect(onAddedChange).toHaveBeenCalledWith(Exclude);
+  });
+});
+
+describe('PoolMenu', () => {
+  const renderMenu = (props: Partial<Parameters<typeof PoolMenu>[0]> = {}) => {
+    const onPoolsChange = jest.fn();
+    const onClose = jest.fn();
+    const result = renderWithTheme(
+      <PoolMenu
+        anchorEl={document.body}
+        open
+        onClose={onClose}
         poolOptions={POOLS}
         pools={{
           [POOL_A.id]: true,
@@ -132,13 +164,12 @@ describe('AddedMenu', () => {
         {...props}
       />,
     );
-    return { onAddedChange, onPoolsChange, onClose, ...result };
+    return { onPoolsChange, onClose, ...result };
   };
 
-  it('lists the Added toggle, the Pools master, and one row per pool', () => {
+  it('lists the Pools master and one row per pool', () => {
     renderMenu();
 
-    expect(checkboxLabelled('Added')).toBeInTheDocument();
     expect(checkboxLabelled('Pools')).toBeInTheDocument();
     expect(checkboxLabelled('Pools 1')).toBeInTheDocument();
     expect(checkboxLabelled('Pools 2')).toBeInTheDocument();
@@ -148,15 +179,6 @@ describe('AddedMenu', () => {
     renderMenu();
 
     expect(checkboxLabelled('Unseeded')).toBeInTheDocument();
-  });
-
-  it('cycles the Added filter like the Paid one', async () => {
-    const user = setupUser();
-    const { onAddedChange } = renderMenu({ addedState: Include });
-
-    await user.click(checkboxLabelled('Added'));
-
-    expect(onAddedChange).toHaveBeenCalledWith(Exclude);
   });
 
   describe('the Pools master checkbox', () => {
@@ -324,6 +346,6 @@ describe('AddedMenu', () => {
     renderMenu({ poolOptions: [], pools: {} });
 
     const menu = screen.getByRole('menu');
-    expect(within(menu).getAllByRole('checkbox')).toHaveLength(2);
+    expect(within(menu).getAllByRole('checkbox')).toHaveLength(1);
   });
 });

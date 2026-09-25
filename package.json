@@ -276,5 +276,9 @@
     ],
     "logLevel": "quiet"
   },
-  "version": "0.0.2"
+  "version": "0.0.2",
+  "allowScripts": {
+    "electron@27.3.11": true,
+    "core-js-pure@3.27.2": true
+  }
 }

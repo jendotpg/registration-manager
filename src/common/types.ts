@@ -83,6 +83,16 @@ export type RegistrationOption = {
   pools?: Pool[];
 };
 
+export function hasPoolsConfigured(
+  registrationOption: RegistrationOption,
+): boolean {
+  return (
+    registrationOption.type === 'event' &&
+    (registrationOption.pools?.some((pool) => pool.id !== UNSEEDED_POOL_ID) ??
+      false)
+  );
+}
+
 export type Tournament = {
   slug: string;
   name: string;

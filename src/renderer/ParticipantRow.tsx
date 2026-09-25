@@ -6,11 +6,14 @@ import {
   Participant,
   RegistrationOption,
   Tournament,
+  UNSEEDED_POOL_ID,
+  hasPoolsConfigured,
 } from '../common/types';
 import EllipsisTooltip from './EllipsisTooltip';
 import {
   COLUMN_GAP,
   CONTROL_GAP,
+  CONTROL_SLOT_PX,
   NAME_COL_WIDTH,
   ROW_PADDING_X_PX,
   TOOLTIP_ENTER_DELAY_MS,
@@ -71,6 +74,7 @@ const NAME_TEXT_SX = {
 } as const;
 
 const CELLS_SX = { flex: 1, justifyContent: 'space-between' } as const;
+const SLOT_SX = { width: `${CONTROL_SLOT_PX}px`, flexShrink: 0 } as const;
 const ROW_SX = { boxSizing: 'border-box' } as const;
 
 function CheckboxCell({
@@ -176,30 +180,77 @@ export default function ParticipantRow({
             />
           );
 
-          return isEvent ? (
+          if (!isEvent) {
+            return (
+              <Stack
+                key={`${id}-checkboxes`}
+                data-option-cell={id}
+                alignItems="center"
+                sx={cellSx}
+              >
+                {paidCell}
+              </Stack>
+            );
+          }
+
+          const pool = tournamentParticipant.pools[id];
+          const poolDisplay =
+            pool && pool.id !== UNSEEDED_POOL_ID
+              ? pool.name || pool.phase || '—'
+              : '—';
+
+          // One equal-width slot per control, matching the header's slots.
+          return (
             <Stack
               key={`${id}-checkboxes`}
+              data-option-cell={id}
               direction="row"
               spacing={CONTROL_GAP}
               justifyContent="center"
               sx={cellSx}
             >
-              {paidCell}
-              <CheckboxCell
-                reason={disabledReason(
-                  startggTournament,
-                  tournamentParticipant,
-                  registrationOption,
-                  'added',
-                )}
-                small
-                checked={!!tournamentParticipant.registeredStatuses[id]}
-                onToggle={() => onToggleAdded(tournamentParticipant.id, id)}
-              />
-            </Stack>
-          ) : (
-            <Stack key={`${id}-checkboxes`} alignItems="center" sx={cellSx}>
-              {paidCell}
+              <Stack alignItems="center" sx={SLOT_SX}>
+                {paidCell}
+              </Stack>
+              <Stack alignItems="center" sx={SLOT_SX}>
+                <CheckboxCell
+                  reason={disabledReason(
+                    startggTournament,
+                    tournamentParticipant,
+                    registrationOption,
+                    'added',
+                  )}
+                  small
+                  checked={!!tournamentParticipant.registeredStatuses[id]}
+                  onToggle={() => onToggleAdded(tournamentParticipant.id, id)}
+                />
+              </Stack>
+              {hasPoolsConfigured(registrationOption) && (
+                <Stack
+                  data-pool-cell={id}
+                  justifyContent="center"
+                  alignItems="center"
+                  sx={SLOT_SX}
+                >
+                  <EllipsisTooltip title={poolDisplay}>
+                    <Typography
+                      noWrap
+                      align="center"
+                      sx={{
+                        maxWidth: '100%',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        color:
+                          poolDisplay === '—'
+                            ? 'text.secondary'
+                            : 'text.primary',
+                      }}
+                    >
+                      {poolDisplay}
+                    </Typography>
+                  </EllipsisTooltip>
+                </Stack>
+              )}
             </Stack>
           );
         })}

@@ -13,6 +13,7 @@ import {
 } from '@mui/icons-material';
 import {
   Dispatch,
+  ReactNode,
   SetStateAction,
   useCallback,
   useEffect,
@@ -27,8 +28,9 @@ import {
   Id,
   FilterState,
   DEFAULT_FILTER_STATE,
+  hasPoolsConfigured,
 } from '../common/types';
-import { PaidMenu, AddedMenu } from './FilterMenus';
+import { PaidMenu, AddedMenu, PoolMenu } from './FilterMenus';
 import SearchField from './SearchField';
 import EllipsisTooltip from './EllipsisTooltip';
 import ParticipantRow from './ParticipantRow';
@@ -37,6 +39,7 @@ import {
   COLUMN_GAP,
   COLUMN_GAP_PX,
   CONTROL_GAP,
+  CONTROL_SLOT_PX,
   NAME_COL_MAX_PX,
   NAME_COL_MIN_PX,
   NAME_COL_WIDTH,
@@ -50,6 +53,33 @@ import {
 const TABLE_HEIGHT_FRACTION = 0.95;
 
 const HEADER_VIEWPORT_SX = { overflow: 'hidden', flexShrink: 0 } as const;
+
+function ControlSlot({
+  label,
+  poolHeader,
+  children,
+}: {
+  label: string;
+  poolHeader: Id | null;
+  children: ReactNode;
+}) {
+  return (
+    <Stack
+      alignItems="center"
+      data-pool-header={poolHeader ?? undefined}
+      sx={{ width: `${CONTROL_SLOT_PX}px`, flexShrink: 0 }}
+    >
+      <Typography
+        noWrap
+        align="center"
+        sx={{ width: '100%', overflow: 'hidden', textOverflow: 'ellipsis' }}
+      >
+        {label}
+      </Typography>
+      {children}
+    </Stack>
+  );
+}
 
 function FilterIconButton({
   small,
@@ -92,6 +122,8 @@ export default function StartggCheckin({
   setPaidMenuOpen,
   registeredMenuOpen,
   setRegisteredMenuOpen,
+  poolMenuOpen,
+  setPoolMenuOpen,
   resetFilters,
 }: {
   startggTournament: Tournament;
@@ -107,10 +139,13 @@ export default function StartggCheckin({
   setPaidMenuOpen: Dispatch<SetStateAction<Record<Id, boolean>>>;
   registeredMenuOpen: Record<Id, boolean>;
   setRegisteredMenuOpen: Dispatch<SetStateAction<Record<Id, boolean>>>;
+  poolMenuOpen: Record<Id, boolean>;
+  setPoolMenuOpen: Dispatch<SetStateAction<Record<Id, boolean>>>;
   resetFilters: () => void;
 }) {
   const paidButtonRefs = useRef<Record<Id, HTMLButtonElement | null>>({});
   const registeredButtonRefs = useRef<Record<Id, HTMLButtonElement | null>>({});
+  const poolButtonRefs = useRef<Record<Id, HTMLButtonElement | null>>({});
 
   const headerViewportRef = useRef<HTMLDivElement | null>(null);
   const listRef = useListRef(null);
@@ -190,6 +225,11 @@ export default function StartggCheckin({
     setRegisteredMenuOpen((prev) => ({ ...prev, [id]: true }));
   const closeRegisteredMenu = (id: Id) =>
     setRegisteredMenuOpen((prev) => ({ ...prev, [id]: false }));
+
+  const openPoolMenu = (id: Id) =>
+    setPoolMenuOpen((prev) => ({ ...prev, [id]: true }));
+  const closePoolMenu = (id: Id) =>
+    setPoolMenuOpen((prev) => ({ ...prev, [id]: false }));
 
   const onTogglePaid = useCallback(async (attendee: Id, option: Id) => {
     try {
@@ -371,9 +411,11 @@ export default function StartggCheckin({
                     const { id } = registrationOption;
                     const isEvent = registrationOption.type === 'event';
                     const filter = filterFor(id);
+
                     return (
                       <Stack
                         key={id}
+                        data-option-cell={id}
                         sx={{
                           width: `${widths[id]}px`,
                           zIndex: 3,
@@ -404,24 +446,28 @@ export default function StartggCheckin({
                             minWidth: '100%',
                           }}
                         >
-                          <FilterIconButton
-                            small={isEvent}
-                            active={!!paidMenuOpen[id]}
-                            buttonRef={(el) => {
-                              paidButtonRefs.current[id] = el;
-                            }}
-                            onClick={() => openPaidMenu(id)}
-                          />
-                          <PaidMenu
-                            anchorEl={paidButtonRefs.current[id] ?? null}
-                            open={!!paidMenuOpen[id]}
-                            onClose={() => closePaidMenu(id)}
-                            paidState={filter.paid}
-                            onPaidChange={(paid) => updateFilter(id, { paid })}
-                          />
+                          <ControlSlot label="Paid" poolHeader={null}>
+                            <FilterIconButton
+                              small={isEvent}
+                              active={!!paidMenuOpen[id]}
+                              buttonRef={(el) => {
+                                paidButtonRefs.current[id] = el;
+                              }}
+                              onClick={() => openPaidMenu(id)}
+                            />
+                            <PaidMenu
+                              anchorEl={paidButtonRefs.current[id] ?? null}
+                              open={!!paidMenuOpen[id]}
+                              onClose={() => closePaidMenu(id)}
+                              paidState={filter.paid}
+                              onPaidChange={(paid) =>
+                                updateFilter(id, { paid })
+                              }
+                            />
+                          </ControlSlot>
 
                           {isEvent && (
-                            <>
+                            <ControlSlot label="Added" poolHeader={null}>
                               <FilterIconButton
                                 small
                                 active={!!registeredMenuOpen[id]}
@@ -440,13 +486,31 @@ export default function StartggCheckin({
                                 onAddedChange={(added) =>
                                   updateFilter(id, { added })
                                 }
+                              />
+                            </ControlSlot>
+                          )}
+
+                          {hasPoolsConfigured(registrationOption) && (
+                            <ControlSlot label="Pool" poolHeader={id}>
+                              <FilterIconButton
+                                small
+                                active={!!poolMenuOpen[id]}
+                                buttonRef={(el) => {
+                                  poolButtonRefs.current[id] = el;
+                                }}
+                                onClick={() => openPoolMenu(id)}
+                              />
+                              <PoolMenu
+                                anchorEl={poolButtonRefs.current[id] ?? null}
+                                open={!!poolMenuOpen[id]}
+                                onClose={() => closePoolMenu(id)}
                                 poolOptions={registrationOption.pools ?? []}
                                 pools={filter.pools}
                                 onPoolsChange={(pools) =>
                                   updateFilter(id, { pools })
                                 }
                               />
-                            </>
+                            </ControlSlot>
                           )}
                         </Stack>
                       </Stack>

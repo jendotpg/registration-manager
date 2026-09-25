@@ -1,10 +1,12 @@
-import { RegistrationOption, Id } from '../common/types';
+import { RegistrationOption, Id, hasPoolsConfigured } from '../common/types';
 
 export const COLUMN_GAP_PX = 8; // between option columns, and name column <-> options
 export const ROW_PADDING_X_PX = 24;
-export const CONTROL_GAP_PX = 4; // between the two controls inside an event column
+export const CONTROL_GAP_PX = 4; // between the control slots inside a column
 export const SMALL_CONTROL_PX = 38; // small Checkbox natural size == forced IconButton size
-export const EVENT_COL_MIN_PX = SMALL_CONTROL_PX * 2 + CONTROL_GAP_PX;
+// Every control (Paid, Added, Pool) gets an equal-width slot, so they sit evenly
+// spaced under the option name with room for their labels.
+export const CONTROL_SLOT_PX = 60;
 export const TOOLTIP_ENTER_DELAY_MS = 350;
 export const LABEL_WIDTH_PAD_PX = 8;
 export const NAME_COL_MAX_PX = 500;
@@ -24,13 +26,24 @@ export const SMALL_ICON_BUTTON_SX = {
   height: `${SMALL_CONTROL_PX}px`,
 } as const;
 
+export function slotCount(registrationOption: RegistrationOption) {
+  if (registrationOption.type !== 'event') {
+    return 1;
+  }
+  return hasPoolsConfigured(registrationOption) ? 3 : 2;
+}
+
 export function columnWidthPx(
   registrationOption: RegistrationOption,
   measuredLabelWidth: number | undefined,
 ) {
   const labelWidth = Math.ceil(measuredLabelWidth ?? 0) + LABEL_WIDTH_PAD_PX;
   return registrationOption.type === 'event'
-    ? Math.max(EVENT_COL_MIN_PX, labelWidth)
+    ? Math.max(
+        CONTROL_SLOT_PX * slotCount(registrationOption) +
+          CONTROL_GAP_PX * (slotCount(registrationOption) - 1),
+        labelWidth,
+      )
     : Math.min(VENUE_COL_MAX_PX, Math.max(VENUE_COL_MIN_PX, labelWidth));
 }
 

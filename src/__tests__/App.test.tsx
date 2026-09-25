@@ -403,11 +403,11 @@ describe('switching tournaments', () => {
     const { user } = await renderApp();
     await electron.emit.tournament(withPools([POOL_A.id, POOL_B.id]));
 
-    // Open the singles "added" menu and untick the first pool.
+    // Open the singles "pool" menu and untick the first pool.
     const filterButtons = screen.getAllByRole('button', {
       name: 'Apply Filter',
     });
-    await user.click(filterButtons[2]);
+    await user.click(filterButtons[3]);
     await user.click(screen.getByRole('checkbox', { name: 'Pools 5001' }));
     await user.keyboard('{Escape}');
 

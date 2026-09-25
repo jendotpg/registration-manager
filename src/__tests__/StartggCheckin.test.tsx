@@ -68,6 +68,7 @@ function renderCheckin(
   const setFilterState = jest.fn();
   const setPaidMenuOpen = jest.fn();
   const setRegisteredMenuOpen = jest.fn();
+  const setPoolMenuOpen = jest.fn();
   const resetFilters = jest.fn();
   const checkin = (menusOpen: boolean) => (
     <StartggCheckin
@@ -82,10 +83,12 @@ function renderCheckin(
       setFilterState={setFilterState}
       setPaidMenuOpen={setPaidMenuOpen}
       setRegisteredMenuOpen={setRegisteredMenuOpen}
+      setPoolMenuOpen={setPoolMenuOpen}
       resetFilters={resetFilters}
       {...props}
       paidMenuOpen={menusOpen ? props.paidMenuOpen ?? {} : {}}
       registeredMenuOpen={menusOpen ? props.registeredMenuOpen ?? {} : {}}
+      poolMenuOpen={menusOpen ? props.poolMenuOpen ?? {} : {}}
     />
   );
 
@@ -97,7 +100,7 @@ function renderCheckin(
   // first pass always has the menus shut, and the requested state arrives in a
   // second render, by which point the buttons exist.
   const result = renderWithTheme(checkin(false));
-  if (props.paidMenuOpen || props.registeredMenuOpen) {
+  if (props.paidMenuOpen || props.registeredMenuOpen || props.poolMenuOpen) {
     result.rerenderWithTheme(checkin(true));
   }
 
@@ -109,6 +112,7 @@ function renderCheckin(
     setFilterState,
     setPaidMenuOpen,
     setRegisteredMenuOpen,
+    setPoolMenuOpen,
     resetFilters,
     ...result,
   };
@@ -554,13 +558,34 @@ describe('the header controls', () => {
 });
 
 describe('the filter menus', () => {
-  it('offers one filter button for the venue fee and two per event', () => {
+  it('offers one filter button for the venue fee and three per pooled event', () => {
     renderCheckin();
 
-    // venue fee paid + singles paid/added + redemption paid/added.
+    // venue fee paid + singles paid/added/pool + redemption paid/added/pool.
     expect(
       screen.getAllByRole('button', { name: 'Apply Filter' }),
-    ).toHaveLength(5);
+    ).toHaveLength(7);
+  });
+
+  it('labels the paid and added filters', () => {
+    renderCheckin();
+
+    // venue fee + singles + redemption.
+    expect(screen.getAllByText('Paid')).toHaveLength(3);
+    expect(screen.getAllByText('Added')).toHaveLength(2);
+  });
+
+  it('opens the pool menu from the Pool column', async () => {
+    const user = setupUser();
+    const { setPoolMenuOpen } = renderCheckin();
+
+    const filters = screen.getAllByRole('button', { name: 'Apply Filter' });
+    await user.click(filters[3]); // singles "pool"
+
+    const update = setPoolMenuOpen.mock.calls[0][0] as (
+      prev: Record<Id, boolean>,
+    ) => Record<Id, boolean>;
+    expect(update({})).toEqual({ [SINGLES]: true });
   });
 
   it('opens the paid menu for the column that was clicked', async () => {
@@ -647,7 +672,7 @@ describe('the filter menus', () => {
       },
     };
     const { setFilterState } = renderCheckin({
-      registeredMenuOpen: { [SINGLES]: true },
+      poolMenuOpen: { [SINGLES]: true },
       filterState: existing,
     });
 
@@ -700,6 +725,30 @@ describe('the filter menus', () => {
     });
 
     expect(screen.getByRole('checkbox', { name: 'Added' })).toBeInTheDocument();
-    expect(screen.getByRole('checkbox', { name: 'Pools' })).toBeInTheDocument();
+    expect(
+      screen.queryByRole('checkbox', { name: 'Pools' }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('renders a pool column next to events with pools configured', () => {
+    renderCheckin();
+    const poolHeaders = screen
+      .getAllByText('Pool')
+      .filter((el) => el.closest('[data-pool-header]'));
+    // Both Melee Singles and Redemption Bracket have pools
+    expect(poolHeaders).toHaveLength(2);
+
+    // Bob is in Singles Pool 1 and unseeded in Redemption
+    const bobRow = rowFor('Bob');
+    expect(within(bobRow).getByText('1')).toBeInTheDocument();
+  });
+
+  it('omits the pool column for events that do not have pools configured', () => {
+    const tournament = nycMeleeTournament();
+    delete tournament.registrationOptions[1].pools;
+    delete tournament.registrationOptions[2].pools;
+    renderCheckin({ startggTournament: tournament });
+
+    expect(screen.queryByText('Pool')).not.toBeInTheDocument();
   });
 });

@@ -145,6 +145,7 @@ function IndexPage() {
   const [registeredMenuOpen, setRegisteredMenuOpen] = useState<
     Record<Id, boolean>
   >({});
+  const [poolMenuOpen, setPoolMenuOpen] = useState<Record<Id, boolean>>({});
 
   const registrationOptionsKey = startggTournament.registrationOptions
     .map((registrationOption) => registrationOption.id)
@@ -170,6 +171,7 @@ function IndexPage() {
   useEffect(() => {
     setPaidMenuOpen({});
     setRegisteredMenuOpen({});
+    setPoolMenuOpen({});
     setSearchText('');
     resetFilters();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -233,6 +235,8 @@ function IndexPage() {
         setPaidMenuOpen={setPaidMenuOpen}
         registeredMenuOpen={registeredMenuOpen}
         setRegisteredMenuOpen={setRegisteredMenuOpen}
+        poolMenuOpen={poolMenuOpen}
+        setPoolMenuOpen={setPoolMenuOpen}
         resetFilters={resetFilters}
       />
 

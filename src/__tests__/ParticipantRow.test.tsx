@@ -102,3 +102,10 @@ it('renders nothing for a participant who is no longer there', () => {
 
   expect(container).toBeEmptyDOMElement();
 });
+
+it('renders the pool identifier for seeded events and dash for unseeded events', () => {
+  renderRow(0); // Alice: seeded in Singles (Pool 1), unseeded in Redemption ('—')
+  const aliceRow = rowElement('TSM | Alice');
+  expect(aliceRow).toHaveTextContent('1');
+  expect(aliceRow).toHaveTextContent('—');
+});
