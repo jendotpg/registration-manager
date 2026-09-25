@@ -24,8 +24,10 @@ import {
 } from '../__fixtures__/renderWithTheme';
 import { makeTournament, nycMeleeTournament } from '../__fixtures__/tournament';
 
-/** Constants mirrored from StartggCheckin.tsx. */
-const EVENT_COL_MIN_PX = 80; // 38 * 2 + 4
+/** Constants mirrored from checkinMetrics.ts. */
+// Three 60px slots (Paid, Added, Pool) and two 4px gaps; both fixture events
+// have pools.
+const EVENT_COL_MIN_PX = 188;
 const VENUE_COL_MIN_PX = 120;
 const VENUE_COL_MAX_PX = 200;
 const LABEL_WIDTH_PAD_PX = 8;
@@ -62,6 +64,8 @@ function renderCheckin(
       paidMenuOpen={{}}
       setPaidMenuOpen={jest.fn()}
       registeredMenuOpen={{}}
+      poolMenuOpen={{}}
+      setPoolMenuOpen={jest.fn()}
       setRegisteredMenuOpen={jest.fn()}
       resetFilters={jest.fn()}
       {...props}
@@ -84,11 +88,9 @@ function columnWidth(optionName: string) {
   return getComputedStyle(column).width;
 }
 
-/** The min-width the whole table asked for. */
 /**
  * The header's table min-width: the nearest ancestor of a column heading that
- * sets one. Walked rather than counted, since an event with pools sits one
- * level deeper, grouped with its Pool column.
+ * sets one.
  */
 function tableMinWidth() {
   let el: HTMLElement | null = screen
@@ -154,10 +156,10 @@ describe('column widths once the labels are measured', () => {
 
   it('rounds a fractional measurement up rather than truncating', () => {
     // Rounding down by a pixel is what makes a label clip at the last letter.
-    restoreMetrics = stubLayoutMetrics({ boundingWidth: 100.2 });
+    restoreMetrics = stubLayoutMetrics({ boundingWidth: 200.2 });
     renderCheckin();
 
-    expect(columnWidth('Melee Singles')).toBe(`${101 + LABEL_WIDTH_PAD_PX}px`);
+    expect(columnWidth('Melee Singles')).toBe(`${201 + LABEL_WIDTH_PAD_PX}px`);
   });
 });
 

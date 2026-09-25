@@ -72,6 +72,30 @@ export function AddedMenu({
   onClose,
   addedState,
   onAddedChange,
+}: {
+  anchorEl: Element | null;
+  open: boolean;
+  onClose: () => void;
+  addedState: NullableBoolean;
+  onAddedChange: (next: NullableBoolean) => void;
+}) {
+  return (
+    <Menu anchorEl={anchorEl} open={open} onClose={onClose}>
+      <MenuItem disableRipple>
+        <CyclingCheckbox
+          label="Added"
+          state={addedState}
+          onChange={onAddedChange}
+        />
+      </MenuItem>
+    </Menu>
+  );
+}
+
+export function PoolMenu({
+  anchorEl,
+  open,
+  onClose,
   poolOptions,
   pools,
   onPoolsChange,
@@ -79,8 +103,6 @@ export function AddedMenu({
   anchorEl: Element | null;
   open: boolean;
   onClose: () => void;
-  addedState: NullableBoolean;
-  onAddedChange: (next: NullableBoolean) => void;
   poolOptions: Pool[];
   pools: Record<Id, boolean>;
   onPoolsChange: (pools: Record<Id, boolean>) => void;
@@ -94,13 +116,6 @@ export function AddedMenu({
 
   return (
     <Menu anchorEl={anchorEl} open={open} onClose={onClose}>
-      <MenuItem disableRipple>
-        <CyclingCheckbox
-          label="Added"
-          state={addedState}
-          onChange={onAddedChange}
-        />
-      </MenuItem>
       <MenuItem disableRipple>
         <Stack direction="row" alignItems="center" sx={{ width: '100%' }}>
           <FormControlLabel

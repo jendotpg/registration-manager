@@ -74,6 +74,8 @@ function renderCheckin() {
       paidMenuOpen={{}}
       setPaidMenuOpen={jest.fn()}
       registeredMenuOpen={{}}
+      poolMenuOpen={{}}
+      setPoolMenuOpen={jest.fn()}
       setRegisteredMenuOpen={jest.fn()}
       resetFilters={jest.fn()}
     />,
@@ -136,11 +138,18 @@ function controlCentresPx(
   containerWidthPx: number,
 ): number[] {
   const style = getComputedStyle(container);
+  // A control inside a fixed-width slot is centred in that slot, so the slot's
+  // width is what places it.
   const items = (Array.from(container.children) as HTMLElement[]).map(
-    (wrapper) => ({
-      marginLeftPx: pxValue(getComputedStyle(wrapper).marginLeft),
-      widthPx: controlWidthPx(controlIn(wrapper)),
-    }),
+    (wrapper) => {
+      const wrapperStyle = getComputedStyle(wrapper);
+      return {
+        marginLeftPx: pxValue(wrapperStyle.marginLeft),
+        widthPx: wrapperStyle.width.endsWith('px')
+          ? parseFloat(wrapperStyle.width)
+          : controlWidthPx(controlIn(wrapper)),
+      };
+    },
   );
 
   if (style.flexDirection === 'column') {
@@ -274,7 +283,7 @@ describe('each checkbox sits under its filter button', () => {
     },
   );
 
-  it('lines up the paid and added controls separately, not just as a group', () => {
+  it('lines up the paid, added and pool controls separately, not just as a group', () => {
     // The failure worth catching: two controls whose group is still centred but
     // which have drifted apart, so the left one is over the gap and the right
     // one over nothing.
@@ -285,9 +294,10 @@ describe('each checkbox sits under its filter button', () => {
     const headerCentres = controlCentresPx(header.controls, header.widthPx);
     const bodyCentres = controlCentresPx(body.cell, body.widthPx);
 
-    expect(headerCentres).toHaveLength(2);
-    expect(round(bodyCentres[0])).toBe(round(headerCentres[0]));
-    expect(round(bodyCentres[1])).toBe(round(headerCentres[1]));
+    expect(headerCentres).toHaveLength(3);
+    headerCentres.forEach((centre, idx) => {
+      expect(round(bodyCentres[idx])).toBe(round(centre));
+    });
     // And they are genuinely two distinct positions, so the assertion above is
     // not passing because everything collapsed to the same number.
     expect(bodyCentres[0]).not.toBe(bodyCentres[1]);
