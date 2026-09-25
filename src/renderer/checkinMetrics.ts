@@ -17,6 +17,9 @@ export const NAME_COL_WIDTH = `max(${NAME_COL_MIN_PX}px, min(${NAME_COL_MAX_PX}p
 export const COLUMN_GAP = `${COLUMN_GAP_PX}px`;
 export const CONTROL_GAP = `${CONTROL_GAP_PX}px`;
 export const ROW_HEIGHT_PX = 50;
+// Below this the search field stops shrinking and the header's action buttons
+// wrap onto the next line instead.
+export const SEARCH_FIELD_MIN_PX = 160;
 
 export const ACTIVE_ICON_BUTTON_SX = {
   backgroundColor: 'action.selected',

@@ -1,5 +1,6 @@
 import { KeyboardEvent, useEffect, useRef, useState } from 'react';
 import { TextField } from '@mui/material';
+import { SEARCH_FIELD_MIN_PX } from './checkinMetrics';
 
 export const SEARCH_DEBOUNCE_MS = 200;
 
@@ -73,8 +74,8 @@ export default function SearchField({
       size="small"
       variant="outlined"
       sx={{
-        flex: 1,
-        minWidth: 0,
+        flex: `1 1 ${SEARCH_FIELD_MIN_PX}px`,
+        minWidth: `${SEARCH_FIELD_MIN_PX}px`,
       }}
     />
   );

@@ -163,6 +163,17 @@ describe('column widths once the labels are measured', () => {
   });
 });
 
+describe('the search header cell', () => {
+  it('lets the action buttons wrap below the search field', () => {
+    renderCheckin();
+    const cell = screen
+      .getByRole('button', { name: 'Copy Listed Participants' })
+      .closest<HTMLElement>('[class*="MuiStack-root"]')!.parentElement!;
+
+    expect(getComputedStyle(cell).flexWrap).toBe('wrap');
+  });
+});
+
 describe('the table minimum width', () => {
   it('grows as the columns grow', () => {
     renderCheckin();
