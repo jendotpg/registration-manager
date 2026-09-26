@@ -14,6 +14,7 @@
  */
 import { act, screen } from '@testing-library/react';
 import SearchField, { SEARCH_DEBOUNCE_MS } from '../renderer/SearchField';
+import { SEARCH_FIELD_MIN_PX } from '../renderer/checkinMetrics';
 import {
   renderWithTheme,
   setupUserWithFakeTimers,
@@ -61,6 +62,17 @@ it('keeps the id the find shortcut looks for', () => {
   renderSearchField();
 
   expect(document.getElementById('search-bar')).toBeInTheDocument();
+});
+
+it('stops shrinking at its minimum width', () => {
+  // Past this the header's action buttons wrap below it rather than squeezing
+  // the box until its label no longer fits.
+  renderSearchField();
+
+  const field = document
+    .getElementById('search-bar')!
+    .closest<HTMLElement>('.MuiTextField-root')!;
+  expect(getComputedStyle(field).minWidth).toBe(`${SEARCH_FIELD_MIN_PX}px`);
 });
 
 it('says nothing until the typing stops', async () => {

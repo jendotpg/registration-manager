@@ -329,6 +329,8 @@ export default function StartggCheckin({
                 direction="row"
                 alignItems="center"
                 sx={{
+                  flexWrap: 'wrap',
+                  gap: '4px',
                   position: 'sticky',
                   left: 0,
                   zIndex: 4,
@@ -352,6 +354,7 @@ export default function StartggCheckin({
                   spacing="4px"
                   sx={{
                     flexShrink: 0,
+                    marginLeft: 'auto',
                   }}
                 >
                   <Tooltip
